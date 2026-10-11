@@ -52,8 +52,15 @@ interface Conv {
   emergencyAt?: number;
   lastOut?: string; // kind of the bot's last message (context for short replies like "sure", "ok")
   pickerFailedAt?: number; // the booking page / form couldn't be delivered to this patient: use the list for a while
+  notice?: "expired"; // the last conversation was left unfinished for over 30 minutes and was reset
   seed: number;
 }
+
+/** Phrases are matched in memory only (like emergency keywords) and never stored. */
+const ABANDON_RE = /\b(don'?t|do not|dont)\s+(want|need)\b|\bno need\b|\bnot now\b|\bleave it\b|\bforget it\b|\bnahi?n?\s+(chahiye|karna|karni)\b|\brehne\s+do\b|\bchh?o+d\s*do\b|\bmat\s+karo\b|नहीं\s+चाहिए|रहने\s+दो|छोड़\s+दो|मत\s+करो/i;
+const RESTART_RE = /^\s*(start\s+(over|again|fresh)|restart|reset|new\s+chat|shuru\s+se|phir\s+se\s+shuru|फिर\s+से\s+शुरू|शुरू\s+से)\b/i;
+/** Buttons from a conversation that has since been reset; they no longer carry enough context to continue. */
+const STALE_BUTTON = /^(slot|vt|bk|see_all|sess|who|resume)(:|$)/;
 
 /** After these the conversation is complete; a bare "ok / sure / thanks" deserves a polite close, not a menu. */
 const CLOSING = new Set(["BOOKING_CONFIRMED", "CX_DONE", "CX_KEPT", "RS_DONE", "REMINDER_CONFIRMED", "STATUS", "STATUS_BOOKED", "STATUS_NEXT", "STATUS_FUTURE",
@@ -101,7 +108,11 @@ async function loadConv(ctx: Ctx, acc: PatientAccount): Promise<Conv> {
   const fresh: Conv = { state: "IDLE", lang: acc.language, p: {}, seed: Math.floor(Math.random() * 1000) };
   if (!row) return fresh;
   const c = row.context as unknown as Conv;
-  if (row.expiresAt < ctx.clock.now()) return { ...fresh, lang: c.lang ?? acc.language, langLock: c.langLock, welcomeSent: c.welcomeSent };
+  if (row.expiresAt < ctx.clock.now()) {
+    // Left unfinished for over 30 minutes: start from the beginning, and tell the patient (if they were mid-way).
+    const midway = !["IDLE", "AWAIT_CONSENT", "AWAIT_NUMBER_CONFIRM"].includes(row.state);
+    return { ...fresh, lang: c.lang ?? acc.language, langLock: c.langLock, welcomeSent: c.welcomeSent, notice: midway ? "expired" : undefined };
+  }
   return { ...fresh, ...c, state: row.state as State };
 }
 
@@ -123,7 +134,11 @@ export async function handleInbound(ctx: Ctx, msg: InboundMessage): Promise<void
   const conv = await loadConv(ctx, acc);
   const t = new Turn(ctx, info, acc, msg.from, conv, await profilesOf(ctx, acc.id));
   try {
-    await route(t, msg);
+    const expired = t.conv.notice === "expired";
+    t.conv.notice = undefined;
+    if (expired) await t.text("SESSION_RESTARTED");
+    if (expired && msg.kind === "button" && STALE_BUTTON.test(msg.buttonId ?? "")) await menu(t, "MAIN_MENU");
+    else await route(t, msg);
   } catch (e) {
     if (e instanceof ErasedSignal) return; // account deleted on request — persist nothing
     ctx.log.error({ err: e }, "conversation_error");
@@ -201,6 +216,8 @@ async function onText(t: Turn, text: string, isVoice: boolean): Promise<void> {
   }
   const emergencyKw = safety.matchesEmergency(text, t.info.settings.emergencyKeywordsExtra);
   if (emergencyKw) return emergency(t);
+  if (RESTART_RE.test(text) && t.conv.state !== "AWAIT_CONSENT") return stopFlow(t, "STARTED_OVER");
+  const abandon = ABANDON_RE.test(text);
 
   const out = await extract(text, extractCtx(t), await t.ctx.cascade());
   const meta = { intent: out.extraction.intent, source: out.source, escalated: out.escalated, reasons: out.reasons, calls: out.calls.map((c) => ({ spec: c.spec, ok: c.ok, ms: c.latencyMs, err: c.error })) };
@@ -222,6 +239,13 @@ async function onText(t: Turn, text: string, isVoice: boolean): Promise<void> {
   } else if (isVoice && ["BOOK", "PROVIDE"].includes(e.intent) && (e.date || e.time || e.partOfDay)) {
     await t.text("VOICE_UNDERSTOOD", { nameJi: t.nameJi(senderName(t)), when: whenLabel(t, e) });
   }
+
+  // Mid-way through a booking, understand what the patient wants now instead of repeating the last question.
+  const inBooking = t.conv.state.startsWith("BK_");
+  if (inBooking && (abandon || (e.intent === "CANCEL" && !e.date)) && !e.date && e.time == null && !e.partOfDay && !e.visitType) return stopFlow(t, "BOOKING_STOPPED");
+  if (inBooking && e.intent === "GREETING") return welcomeBack(t);
+  if (t.conv.state !== "IDLE" && e.intent === "GREETING") return stopFlow(t, "MAIN_MENU"); // e.g. "hi" instead of confirming a cancellation
+  if (inBooking && e.intent === "BOOK" && !e.date && e.time == null && !e.partOfDay && !["BK_WHO", "BK_NAME"].includes(t.conv.state)) return newBooking(t, e);
 
   // Global intents work from any state.
   switch (e.intent) {
@@ -250,9 +274,11 @@ async function onState(t: Turn, e: Extraction): Promise<void> {
     case "AWAIT_ALT_NUMBER": return altNumber(t, e);
     case "BK_WHO": return answerWho(t, e);
     case "BK_NAME": return answerName(t, e);
-    case "BK_WHEN": return answerWhen(t, e);
+    case "BK_WHEN": if (e.intent === "DENY" && !e.date && e.time == null) return stopFlow(t, "BOOKING_STOPPED"); return answerWhen(t, e);
     case "BK_PICK_SLOT": return answerPick(t, e);
-    case "BK_FLOW_OPEN": return answerWhen(t, e); // typed a day/time instead of using the booking page
+    case "BK_FLOW_OPEN": // typed a day/time instead of using the booking page
+      if (e.intent === "DENY" && !e.date && e.time == null) return stopFlow(t, "BOOKING_STOPPED");
+      return answerWhen(t, e);
     case "BK_VISIT_TYPE":
       if (e.visitType) { t.conv.p.visitType = e.visitType; return askConfirm(t); }
       if (e.date || e.time != null) return answerPick(t, e);
@@ -380,6 +406,8 @@ async function onButton(t: Turn, id: string): Promise<void> {
   const [kind, a, b] = id.split(":");
   if (kind === "consent" || kind === "num") { if (await gates(t, null, id)) await resumePending(t); return; }
   if (!(await gates(t, null))) return;
+  // A booking button from a conversation that's no longer in progress: start from the menu instead of half a booking.
+  if (t.conv.state === "IDLE" && !t.conv.p.intent && STALE_BUTTON.test(id)) return menu(t, "MAIN_MENU");
   switch (kind) {
     case "slot": {
       const [date, min] = (a ?? "").split("|");
@@ -389,7 +417,11 @@ async function onButton(t: Turn, id: string): Promise<void> {
     case "see_all": return slotPicker(t, t.conv.requested?.date ?? nowLocal(t.ctx).date);
     case "sess": { const [date, label] = (a ?? "").split("|"); return slotPicker(t, date ?? nowLocal(t.ctx).date, false, label); }
     case "vt": t.conv.p.visitType = a as VisitType; return askConfirm(t);
-    case "bk": return a === "yes" ? finalize(t) : changeTime(t);
+    case "bk": return a === "yes" ? finalize(t) : a === "stop" ? stopFlow(t, "BOOKING_STOPPED") : changeTime(t);
+    case "resume":
+      if (a === "go") return resumePrompt(t);
+      if (a === "new") return newBooking(t, null);
+      return stopFlow(t, "MAIN_MENU");
     case "who":
       if (a === "me") { t.conv.p.forWhom = "self"; t.conv.p.whoAsked = true; t.conv.p.profileId = undefined; return progressBooking(t); }
       if (a === "other") { t.conv.p.forWhom = "new_person"; t.set("BK_NAME"); return t.text("ASK_NAME_OTHER"); }
@@ -562,7 +594,8 @@ async function answerName(t: Turn, e: Extraction): Promise<void> {
 async function answerWhen(t: Turn, e: Extraction): Promise<void> {
   if (!(e.date || e.time || e.partOfDay)) {
     if (e.intent === "AFFIRM" && t.conv.offered?.length === 1) return choose(t, t.conv.offered[0]!);
-    return t.text("ASK_WHEN");
+    // Don't repeat the same question: offer the free times, or a way out.
+    return t.buttons(t.t("ASK_WHEN_RETRY"), "ASK_WHEN_RETRY", [{ id: "see_all", title: t.b("SHOW_FREE_TIMES") }, { id: "bk:stop", title: t.b("STOP_BOOKING") }]);
   }
   // "same day" while rescheduling → keep the old appointment's date
   if (!e.date && t.conv.p.intent === "RESCHEDULE" && t.conv.p.rescheduleId) {
@@ -1066,18 +1099,50 @@ async function callClinic(t: Turn): Promise<void> {
   await t.send({ kind: "contact", name: t.info.clinic.name, phone: t.info.clinic.phone }, "CLINIC_CONTACT");
 }
 
-async function menu(t: Turn, id: "MAIN_MENU" | "OTHER_HELP"): Promise<void> {
+async function menu(t: Turn, id: "MAIN_MENU" | "OTHER_HELP" | "BOOKING_STOPPED" | "STARTED_OVER"): Promise<void> {
   const name = t.profiles.find((p) => p.relation === "SELF")?.name ?? waName(t.acc);
   return t.buttons(t.t(id, { nameJi: t.nameJi(name ? firstName(name) : null) }), id, [
     { id: "menu:book", title: t.b("BOOK") }, { id: "menu:appts", title: t.b("MY_APPTS") }, { id: "menu:status", title: t.b("QUEUE_STATUS") },
   ]);
 }
 
+/** Drop whatever was in progress (releasing a held slot) and show the menu. */
+async function stopFlow(t: Turn, id: "BOOKING_STOPPED" | "STARTED_OVER" | "MAIN_MENU"): Promise<void> {
+  if (t.conv.held) { await releaseHold(t.ctx, t.conv.held); t.conv.held = undefined; }
+  t.conv.p = {};
+  t.conv.offered = undefined;
+  t.conv.requested = undefined;
+  t.conv.raceLost = false;
+  t.set("IDLE");
+  return menu(t, id);
+}
+
+/** "I want to book" in the middle of a booking: start that booking afresh. */
+async function newBooking(t: Turn, e: Extraction | null): Promise<void> {
+  if (t.conv.held) { await releaseHold(t.ctx, t.conv.held); t.conv.held = undefined; }
+  t.conv.offered = undefined;
+  t.conv.requested = undefined;
+  t.conv.p = { intent: "BOOK" };
+  t.set("IDLE");
+  return e ? startBooking(t, e) : progressBooking(t);
+}
+
+/** "Hi" in the middle of something: say hello and ask whether to carry on. */
+async function welcomeBack(t: Turn): Promise<void> {
+  const name = currentName(t);
+  const who = !name ? "" : t.lang === "en" ? ` for ${name} ji` : t.lang === "hi" ? ` ${name} जी के लिए` : ` ${name} ji ke liye`;
+  return t.buttons(t.t("WELCOME_BACK_MIDFLOW", { who }), "WELCOME_BACK_MIDFLOW",
+    [{ id: "resume:go", title: t.b("CONTINUE") }, { id: "resume:new", title: t.b("NEW_BOOKING") }, { id: "resume:menu", title: t.b("SOMETHING_ELSE") }]);
+}
+
 async function resumePrompt(t: Turn): Promise<void> {
   const s = t.conv.state;
+  if (s === "BK_CONFIRM") return askConfirm(t);
+  if (s === "BK_FLOW_OPEN" || s === "BK_WHO" || s === "BK_NAME") return progressBooking(t);
   if (s === "BK_PICK_SLOT" && t.conv.offered?.length) return t.buttons(t.t("RESUME_PROMPT", { pending: t.t("OFFER_NEXT_AVAILABLE") }), "RESUME_PROMPT", [...t.conv.offered.slice(0, 2).map(slotBtn), { id: "see_all", title: t.b("SEE_ALL") }]);
   if (s === "BK_WHEN") return t.text("RESUME_PROMPT", { pending: t.t("ASK_WHEN") });
   if (s === "BK_VISIT_TYPE") return askVisitType(t);
+  return menu(t, "MAIN_MENU");
 }
 
 async function clinicInfoReply(t: Turn, topic: Extraction["clinicInfoTopic"]): Promise<void> {

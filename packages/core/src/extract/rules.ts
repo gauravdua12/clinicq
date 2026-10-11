@@ -184,7 +184,7 @@ function intentOf(t: string, ctx: ExtractContext, extracted: { time: string | nu
   if (has(/\b(thank|thanks|thx|thnx|dhanyavaad|dhanyawad|shukriya)\b|धन्यवाद|शुक्रिया/)) return "THANKS";
   if (has(/\b(appointment|appoinment|apointment|appt|book|booking|slot|milna|milne|dikhana|dikhane|dikhani|consult|checkup|check up|check-up|visit|time chahiye|time do|aana hai|aa sakta|aa sakti|mil sakta|mil sakti|doctor se)\b|अपॉइंटमेंट|दिखाना|मिलना/)) {
     if (/BK_PICK_SLOT/.test(ctx.state) && extracted.time) return "PROVIDE";
-    return /BK_|RS_|WALKIN/.test(ctx.state) && !has(/\b(book|appointment)\b/) ? "PROVIDE" : "BOOK";
+    return /BK_|RS_|WALKIN/.test(ctx.state) && !has(/\b(book|booking|appointment)\b|\b(new|naya|nayi|another|dusra|doosra|ek aur)\b/) ? "PROVIDE" : "BOOK";
   }
   if (has(/^(hi+|hello|hey|hlo|namaste|namaskar|good (morning|afternoon|evening))\b/) && s.split(/\s+/).length <= 4) return "GREETING";
   if (has(/^(no|nahi|nahin|na|nope|nah|mat)\b/)) return extracted.time || extracted.date ? "DENY" : "DENY";

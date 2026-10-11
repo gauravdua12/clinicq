@@ -80,6 +80,14 @@ const P: Persona[] = [
     check: (r) => expectAll([!r.texts.some((t) => /metformin|insulin|mg\b|tablet/i.test(t)), "no medical advice"], [has(r, "HEALTH_DETAILS_REDIRECT") || has(r, "OTHER_HELP"), "polite redirect"]) },
   { id: "u25", title: "Says thanks after booking", setup: "self", steps: [{ say: "book me tomorrow 12:20 pm" }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म/ }, { say: "thank you so much" }],
     check: (r) => expectAll([has(r, "THANKS_REPLY"), "thanks reply"], [bookedOn(r, "2026-10-10", "12:20", "12:20"), "booked"]) },
+  { id: "u26", title: "Says hi in the middle of a booking → asked to continue, not the same question", setup: "self", steps: [{ say: "appointment chahiye" }, { say: "hi" }, { tap: /Continue/i }],
+    check: (r) => expectAll([has(r, "WELCOME_BACK_MIDFLOW"), "welcome back offered"], [r.kinds.filter((k) => k === "ASK_WHEN").length <= 1, "didn't repeat the day/time question"]) },
+  { id: "u27", title: "Changes mind: doesn't want to book any more", setup: "self", steps: [{ say: "kal subah 10 baje book karna hai" }, { say: "nahi rehne do, abhi nahi chahiye" }],
+    check: (r) => expectAll([has(r, "BOOKING_STOPPED"), "booking stopped"], [r.booked.length === 0, "nothing booked"]) },
+  { id: "u28", title: "Comes back 40 minutes later and says hi → told it starts fresh", setup: "self", steps: [{ say: "book appointment" }, { at: "2026-10-09T12:40:00+05:30" }, { say: "hi" }],
+    check: (r) => expectAll([has(r, "SESSION_RESTARTED"), "told it starts fresh"], [r.kinds.at(-1) === "MAIN_MENU", "then the menu"]) },
+  { id: "u29", title: "Mid-booking asks for a new booking instead", setup: "self", steps: [{ say: "book me tomorrow" }, { say: "actually I want a new booking" }],
+    check: (r) => expectAll([!r.kinds.slice(-1).includes("ASK_WHEN_RETRY"), "treated as a new booking, not a non-answer"]) },
 ];
 
 const only = process.argv.includes("--only") ? process.argv[process.argv.indexOf("--only") + 1] : null;

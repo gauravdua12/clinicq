@@ -279,3 +279,11 @@ Sent from a whitelisted number to the clinic number. Case-insensitive; Hindi ali
 - **Short replies after a finished action** ("ok", "sure", "no") get `ACK_CLOSING`, not the menu.
 - **Queue status without a booking today** starts "Queue status is visible for your bookings only". If there is a later booking, the reply shows it (`STATUS_FUTURE`).
 - **Visit type:** the question explains the options, and the button is "Report review". The confirmation shows the visit type.
+
+## Unfinished chats and changing course (11 Oct 2026)
+- **30-minute reset:** a conversation left unfinished for 30 minutes starts fresh. The welcome message says so. On return the patient gets `SESSION_RESTARTED`, then their message is handled normally. Booking buttons from the old chat lead to the menu.
+- **"Hi" mid-booking:** `WELCOME_BACK_MIDFLOW` with Continue / New booking / Something else. Mid-way through anything else, "hi" gets the main menu.
+- **Stop:** "don't want to book", "nahi chahiye", "rehne do" or "cancel" (without a day), or "no" when asked for a day, gives `BOOKING_STOPPED` and releases any held slot. Phrases are matched in memory only.
+- **Start over:** "start over", "restart", "shuru se" gives `STARTED_OVER` from any point.
+- **New booking:** "I want to book" / "new booking" mid-booking starts that booking afresh.
+- **A reply with no day:** `ASK_WHEN_RETRY` with Show free times / Stop booking, instead of repeating the question.

@@ -481,3 +481,86 @@ describe("slot picker setting (console switch)", () => {
     expect(["LIST_PICK_SESSION", "LIST_PICKER"]).toContain((await h.kinds(PATIENT)).at(-1)); // in-chat format
   });
 });
+
+describe("coming back to an unfinished chat", () => {
+  const midBooking = async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    Object.assign(h.ctx.env, { BOOKING_PAGE: false }); // ask "which day and time?" in chat
+    await onboard(h);
+    await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
+    await h.say(PATIENT, "book for me");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("ASK_WHEN");
+  };
+  afterEach(() => { if (h) Object.assign(h.ctx.env, { BOOKING_PAGE: true }); });
+
+  it("welcome message tells patients unfinished chats restart after 30 minutes", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    await h.say(PATIENT, "Hi");
+    const w = h.wa.last(PATIENT);
+    expect(w?.kind === "buttons" && w.body).toMatch(/unfinished for 30 minutes, I'll start fresh/);
+  });
+
+  it("after 30 minutes away: told it starts fresh, then 'hi' gets the menu (not the old question)", async () => {
+    await midBooking();
+    h.clock.advance(31 * 60_000);
+    await h.say(PATIENT, "Hi");
+    expect((await h.kinds(PATIENT)).slice(-2)).toEqual(["SESSION_RESTARTED", "MAIN_MENU"]);
+    h.clock.advance(31 * 60_000);
+    await h.tap(PATIENT, "see_all"); // an old button from the expired chat
+    expect((await h.kinds(PATIENT)).slice(-1)).toEqual(["MAIN_MENU"]); // nothing pending any more → no notice, just the menu
+  });
+
+  it("an old slot button after the reset leads to the menu, not a half booking", async () => {
+    await midBooking();
+    await h.say(PATIENT, "tomorrow evening");
+    h.clock.advance(31 * 60_000);
+    await h.tap(PATIENT, "slot:2026-10-10|1090");
+    expect((await h.kinds(PATIENT)).slice(-2)).toEqual(["SESSION_RESTARTED", "MAIN_MENU"]);
+    expect(await h.db.appointment.count({ where: { status: { in: ["HELD", "BOOKED"] } } })).toBe(0);
+  });
+
+  it("'hi' mid-booking: hello again, continue / new booking / something else", async () => {
+    await midBooking();
+    await h.say(PATIENT, "Hi");
+    const m = h.wa.last(PATIENT);
+    expect(m?.kind === "buttons" && m.body).toMatch(/Hello again 👋 We were in the middle of a booking for Ramesh ji/);
+    expect(m?.kind === "buttons" && m.buttons.map((b) => b.title)).toEqual(["Continue", "New booking", "Something else"]);
+    await h.tap(PATIENT, "resume:go");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("RESUME_PROMPT");
+    await h.say(PATIENT, "hello");
+    await h.tap(PATIENT, "resume:menu");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("MAIN_MENU");
+  });
+
+  it("'I don't want to book' stops the booking and frees the held slot", async () => {
+    await midBooking();
+    await h.say(PATIENT, "tomorrow 6:10 pm");
+    expect(await h.db.appointment.count({ where: { status: "HELD" } })).toBe(1);
+    await h.say(PATIENT, "I don't want to book now");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("BOOKING_STOPPED");
+    expect(await h.db.appointment.count({ where: { status: "HELD" } })).toBe(0);
+    await h.say(PATIENT, "ok");
+    expect((await h.kinds(PATIENT)).at(-1)).not.toBe("ASK_WHEN");
+  });
+
+  it("'rehne do' / 'start over' / 'new booking' each do what they say", async () => {
+    await midBooking();
+    await h.say(PATIENT, "rehne do");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("BOOKING_STOPPED");
+    await h.say(PATIENT, "book for me");
+    await h.say(PATIENT, "start over");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("STARTED_OVER");
+    await h.say(PATIENT, "book for me");
+    await h.say(PATIENT, "I want a new booking");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("ASK_WHEN"); // a fresh booking, not the retry prompt
+  });
+
+  it("a reply without a day doesn't repeat the question: offers free times or stopping", async () => {
+    await midBooking();
+    await h.say(PATIENT, "hmm let me see");
+    const m = h.wa.last(PATIENT);
+    expect(m?.kind === "buttons" && m.buttons.map((b) => b.title)).toEqual(["Show free times", "Stop booking"]);
+    await h.tap(PATIENT, "bk:stop");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("BOOKING_STOPPED");
+  });
+});

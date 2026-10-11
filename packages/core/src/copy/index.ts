@@ -13,9 +13,9 @@ const DISCLAIMER: Entry = {
 
 export const COPY = {
   WELCOME_CONSENT: {
-    en: `Hello! 👋 ${DISCLAIMER.en}\n\nBefore we start: we save only your name, number and appointment details to manage your visit. Privacy notice: {{noticeUrl}}`,
-    hi: `नमस्ते! 👋 ${DISCLAIMER.hi}\n\nशुरू करने से पहले: आपकी विज़िट के लिए हम केवल नाम, नंबर और अपॉइंटमेंट की जानकारी रखते हैं। प्राइवेसी नोटिस: {{noticeUrl}}`,
-    hinglish: `Namaste! 👋 ${DISCLAIMER.hinglish}\n\nShuru karne se pehle: hum sirf aapka naam, number aur appointment details rakhte hain. Privacy notice: {{noticeUrl}}`,
+    en: `Hello! 👋 ${DISCLAIMER.en}\n\nBefore we start: we save only your name, number and appointment details to manage your visit. Privacy notice: {{noticeUrl}}\n\nIf a chat is left unfinished for 30 minutes, I'll start fresh the next time you message.`,
+    hi: `नमस्ते! 👋 ${DISCLAIMER.hi}\n\nशुरू करने से पहले: आपकी विज़िट के लिए हम केवल नाम, नंबर और अपॉइंटमेंट की जानकारी रखते हैं। प्राइवेसी नोटिस: {{noticeUrl}}\n\nअगर कोई बातचीत 30 मिनट तक अधूरी रहे, तो अगली बार हम नए सिरे से शुरू करेंगे।`,
+    hinglish: `Namaste! 👋 ${DISCLAIMER.hinglish}\n\nShuru karne se pehle: hum sirf aapka naam, number aur appointment details rakhte hain. Privacy notice: {{noticeUrl}}\n\nAgar chat 30 minute tak adhoori rahe, to agli baar hum naye sire se shuru karenge.`,
   },
   CONSENT_DECLINED: {
     en: "No problem. Without this I can't book online, but you're welcome to call the clinic at {{clinicPhone}} 📞.",
@@ -364,6 +364,31 @@ export const COPY = {
     hi: "{{name}} जी के लिए सभी ख़ाली समय देखने और चुनने के लिए बटन दबाएँ। बुकिंग से पहले आप कन्फ़र्म करेंगे।\nचाहें तो लिख भी सकते हैं, जैसे \"कल शाम 6 बजे\"।",
     hinglish: "{{name}} ji ke liye saare khaali time dekhne aur chunne ke liye button dabaiye. Booking se pehle aap confirm karenge.\nChahein to likh bhi sakte hain, jaise \"kal shaam 6 baje\".",
   },
+  SESSION_RESTARTED: {
+    en: "Welcome back 👋 Your earlier request was left unfinished for over 30 minutes, so we're starting fresh.",
+    hi: "वापसी पर स्वागत है 👋 आपका पिछला अनुरोध 30 मिनट से ज़्यादा अधूरा रहा, इसलिए हम नए सिरे से शुरू कर रहे हैं।",
+    hinglish: "Welcome back 👋 Aapki pichhli request 30 minute se zyada adhoori rahi, isliye hum naye sire se shuru kar rahe hain.",
+  },
+  WELCOME_BACK_MIDFLOW: {
+    en: "Hello again 👋 We were in the middle of a booking{{who}}. Would you like to continue?",
+    hi: "फिर से नमस्ते 👋 हम{{who}} बुकिंग कर रहे थे। क्या जारी रखें?",
+    hinglish: "Phir se namaste 👋 Hum{{who}} booking kar rahe the. Kya continue karein?",
+  },
+  BOOKING_STOPPED: {
+    en: "No problem, I've stopped this booking 👍 Is there anything else I can help with?",
+    hi: "कोई बात नहीं, मैंने यह बुकिंग रोक दी है 👍 क्या कुछ और मदद करूँ?",
+    hinglish: "Koi baat nahi, maine yeh booking rok di hai 👍 Kuch aur madad karoon?",
+  },
+  STARTED_OVER: {
+    en: "Okay, let's start fresh 👍 What would you like to do?",
+    hi: "ठीक है, नए सिरे से शुरू करते हैं 👍 आप क्या करना चाहेंगे?",
+    hinglish: "Theek hai, naye sire se shuru karte hain 👍 Kya karna hai?",
+  },
+  ASK_WHEN_RETRY: {
+    en: "Sorry, I didn't catch the day. Tap *Show free times*, or tell me something like \"tomorrow evening\".",
+    hi: "माफ़ कीजिए, दिन समझ नहीं आया। *ख़ाली समय देखें* दबाएँ, या बताइए जैसे \"कल शाम\"।",
+    hinglish: "Sorry, din samajh nahi aaya. *Khaali time dekhein* dabaiye, ya bataiye jaise \"kal shaam\".",
+  },
   STALE_MESSAGE: {
     en: "Sorry, we couldn't reply to your earlier message 🙏 Please send your request again and I'll help right away.",
     hi: "माफ़ कीजिए, हम आपके पिछले संदेश का जवाब नहीं दे पाए 🙏 कृपया अपना अनुरोध दोबारा भेजें, मैं तुरंत मदद करूँगा।",
@@ -549,6 +574,11 @@ export const BTN = {
   CONFIRM: { en: "Confirm", hi: "कन्फ़र्म", hinglish: "Confirm" },
   CONFIRM_BOOKING: { en: "Confirm booking", hi: "कन्फ़र्म करें", hinglish: "Confirm karein" },
   CHANGE_TIME: { en: "Change time", hi: "समय बदलें", hinglish: "Time badlein" },
+  CONTINUE: { en: "Continue", hi: "जारी रखें", hinglish: "Continue karein" },
+  NEW_BOOKING: { en: "New booking", hi: "नई बुकिंग", hinglish: "Nayi booking" },
+  SOMETHING_ELSE: { en: "Something else", hi: "कुछ और", hinglish: "Kuch aur" },
+  SHOW_FREE_TIMES: { en: "Show free times", hi: "ख़ाली समय देखें", hinglish: "Khaali time dekhein" },
+  STOP_BOOKING: { en: "Stop booking", hi: "बुकिंग रोकें", hinglish: "Booking rokein" },
   YES_CANCEL: { en: "Yes, cancel", hi: "हाँ, कैंसल करें", hinglish: "Haan, cancel karo" },
   KEEP_IT: { en: "Keep it", hi: "रहने दें", hinglish: "Rehne do" },
   TRY_ANOTHER_DAY: { en: "Try another day", hi: "दूसरा दिन", hinglish: "Doosra din" },
