@@ -97,8 +97,16 @@ try {
   await say("ek aur appointment chahiye mere liye");
   if ((await state()) === "BK_WHO") await tap("who:me");
   const accNow = await account();
-  const link = accNow ? await db.flowToken.findFirst({ where: { accountId: accNow.id }, orderBy: { expiresAt: "desc" } }) : null;
-  check("booking link created for the patient", !!link, link ? undefined : `state ${await state()}`);
+  const active = await db.systemConfig.findUnique({ where: { key: "activeClinicId" } });
+  const clinic = await db.clinic.findFirst({ where: active ? { id: String(active.value) } : {}, orderBy: { createdAt: "asc" } });
+  const picker = (clinic?.settings as { slotPicker?: string } | null)?.slotPicker ?? "page";
+  let link = accNow ? await db.flowToken.findFirst({ where: { accountId: accNow.id }, orderBy: { expiresAt: "desc" } }) : null;
+  if (picker === "chat") {
+    check("in-chat format used, as set for this clinic", !link && ["BK_WHEN", "BK_PICK_SLOT"].includes(await state()), `state ${await state()}`);
+    // The booking page itself is still checked, with a link made the way the bot makes one.
+    const prof = accNow ? await db.patientProfile.findFirst({ where: { accountId: accNow.id } }) : null;
+    if (accNow && prof) link = await db.flowToken.create({ data: { token: `lc${randomUUID().replace(/-/g, "")}`, accountId: accNow.id, profileId: prof.id, expiresAt: new Date(Date.now() + 30 * 60_000) } });
+  } else check("booking link created for the patient", !!link, link ? undefined : `state ${await state()}`);
   if (link) {
     const info = await (await fetch(`${BASE}/api/book/${link.token}`)).json() as { dates: { date: string; enabled: boolean }[] };
     const open = info.dates.filter((d) => d.enabled).map((d) => d.date);
