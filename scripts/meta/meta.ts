@@ -65,7 +65,8 @@ if (cmd === "check") {
   console.log(await g(`${WABA}/subscribed_apps`, { body: {} }));
 } else if (cmd === "templates") {
   need(["WA_BUSINESS_ACCOUNT_ID", WABA]);
-  const existing = new Set(((await g(`${WABA}/message_templates?fields=name,language&limit=200`)).data as { name: string; language: string }[]).map((t) => `${t.name}/${t.language}`));
+  const rows = (await g(`${WABA}/message_templates?fields=id,name,language,status&limit=200`)).data as { id: string; name: string; language: string; status: string }[];
+  const existing = new Map(rows.map((t) => [`${t.name}/${t.language}`, t]));
   for (const [name, def] of Object.entries(TEMPLATES)) {
     if (name === "staff_login_otp") {
       if (!existing.has(`${name}/en`)) {
@@ -75,11 +76,15 @@ if (cmd === "check") {
       continue;
     }
     for (const lang of ["en", "hi"] as const) {
-      if (existing.has(`${name}/${lang}`)) { console.log(`${name}/${lang}: exists`); continue; }
       const t = TEMPLATE_TEXT[name as keyof typeof TEMPLATE_TEXT][lang];
       const components: unknown[] = [{ type: "BODY", text: t.body, example: { body_text: [t.examples] } }];
       if (t.buttons?.length) components.push({ type: "BUTTONS", buttons: t.buttons });
-      const r = await g(`${WABA}/message_templates`, { body: { name, language: lang, category: def.category, components } }).catch((e) => ({ error: String(e) }));
+      const cur = existing.get(`${name}/${lang}`);
+      if (cur && cur.status !== "REJECTED") { console.log(`${name}/${lang}: ${cur.status}`); continue; }
+      // A rejected template is edited in place (its name can't be reused for a new one).
+      const r = cur
+        ? await g(cur.id, { body: { category: def.category, components } }).then((x) => ({ ...x, edited: true })).catch((e) => ({ error: String(e) }))
+        : await g(`${WABA}/message_templates`, { body: { name, language: lang, category: def.category, components } }).catch((e) => ({ error: String(e) }));
       console.log(`${name}/${lang} →`, JSON.stringify(r));
     }
   }

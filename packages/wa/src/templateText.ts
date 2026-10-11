@@ -14,11 +14,11 @@ const qr = (...t: string[]) => t.map((text) => ({ type: "QUICK_REPLY" as const, 
 
 export const TEMPLATE_TEXT: Record<Exclude<TemplateName, "staff_login_otp">, Record<Lang, TemplateText>> = {
   appointment_confirmed: {
-    en: { body: "Your appointment is confirmed.\n{{1}}, {{2}} at {{3}}\nToken {{4}}\nLocation: {{5}}\nReply here anytime to reschedule or cancel.", examples: ["Sunita", "Sat 10 Oct", "6:10 PM", "A-4", "Sector 15, Gurugram"], buttons: qr("Reschedule", "Cancel") },
+    en: { body: "Hello {{1}}, your appointment is confirmed for {{2}} at {{3}}. Your token number is {{4}}.\nClinic address: {{5}}\nTo reschedule or cancel this appointment, reply to this message at any time.", examples: ["Sunita", "Sat 10 Oct", "6:10 PM", "A-4", "Sector 15, Gurugram"], buttons: qr("Reschedule", "Cancel") },
     hi: { body: "आपका अपॉइंटमेंट कन्फ़र्म है।\n{{1}}, {{2}} को {{3}} बजे\nटोकन {{4}}\nपता: {{5}}\nरी-शेड्यूल या कैंसल के लिए कभी भी यहाँ जवाब दें।", examples: ["सुनीता", "शनि 10 अक्टू", "6:10 PM", "A-4", "सेक्टर 15, गुरुग्राम"], buttons: qr("री-शेड्यूल", "कैंसल") },
   },
   reminder_24h: {
-    en: { body: "Reminder: {{1}} ji, your appointment with {{2}} is tomorrow, {{3}} at {{4}} (Token {{5}}).", examples: ["Ramesh", "Dr. Sharma", "Mon 12 Oct", "10:20 AM", "A-2"], buttons: qr("Confirm", "Reschedule", "Cancel") },
+    en: { body: "Hello {{1}} ji, this is a reminder of your appointment with {{2}} tomorrow, {{3}}, at {{4}}. Your token number is {{5}}. Please tap a button below to confirm, reschedule or cancel.", examples: ["Ramesh", "Dr. Sharma", "Mon 12 Oct", "10:20 AM", "A-2"], buttons: qr("Confirm", "Reschedule", "Cancel") },
     hi: { body: "याद दिला रहे हैं: {{1}} जी, {{2}} के साथ आपका अपॉइंटमेंट कल, {{3}} को {{4}} बजे है (टोकन {{5}})।", examples: ["रमेश", "डॉ. शर्मा", "सोम 12 अक्टू", "10:20 AM", "A-2"], buttons: qr("कन्फ़र्म", "री-शेड्यूल", "कैंसल") },
   },
   reminder_same_day: {
@@ -42,8 +42,8 @@ export const TEMPLATE_TEXT: Record<Exclude<TemplateName, "staff_login_otp">, Rec
     hi: { body: "नमस्ते {{1}} जी, अब आपकी बारी है। कृपया डॉक्टर के केबिन में आइए।", examples: ["अनिल"] },
   },
   walkin_token: {
-    en: { body: "Token {{1}} for {{2}} ji at {{3}}. {{4}} patients ahead, about {{5}} min.", examples: ["W-7", "Anil", "Dr. Sharma's Clinic", "3", "20"], buttons: qr("Check status") },
-    hi: { body: "टोकन {{1}}: {{2}} जी, {{3}}। आपसे पहले {{4}} मरीज़, लगभग {{5}} मिनट।", examples: ["W-7", "अनिल", "डॉ. शर्मा क्लिनिक", "3", "20"], buttons: qr("मेरी बारी देखें") },
+    en: { body: "Token {{1}} has been issued for {{2}} ji at {{3}}. There are {{4}} patients ahead of you, and the expected wait is about {{5}} minutes. We will message you again when your turn is near.", examples: ["W-7", "Anil", "Dr. Sharma's Clinic", "3", "20"], buttons: qr("Check status") },
+    hi: { body: "टोकन {{1}} जारी किया गया है: {{2}} जी, {{3}}। आपसे पहले {{4}} मरीज़ हैं और अनुमानित इंतज़ार लगभग {{5}} मिनट है। आपकी बारी नज़दीक आने पर हम आपको फिर से संदेश भेजेंगे।", examples: ["W-7", "अनिल", "डॉ. शर्मा क्लिनिक", "3", "20"], buttons: qr("मेरी बारी देखें") },
   },
   followup_due: {
     en: { body: "Hello {{1}} ji, your follow-up visit with {{2}} is due on {{3}}. Reply to book a time.", examples: ["Sunita", "Dr. Sharma", "17 Oct"], buttons: qr("Book now") },
@@ -54,8 +54,8 @@ export const TEMPLATE_TEXT: Record<Exclude<TemplateName, "staff_login_otp">, Rec
     hi: { body: "आज के {{1}} सेशन की वॉक-इन सूची भर गई है। {{2}} ({{3}}) रिसेप्शन पर हैं। क्या एडजस्ट कर सकते हैं?", examples: ["शाम", "अनिल वर्मा", "+91 99887 xxxxx"], buttons: qr("हाँ", "नहीं") },
   },
   daily_summary: {
-    en: { body: "Today at {{1}}: {{2}} booked, {{3}} walk-ins, {{4}} completed, {{5}} no-shows, average wait {{6}} min.", examples: ["Dr. Sharma's Clinic", "18", "9", "25", "2", "14"] },
-    hi: { body: "आज {{1}} में: {{2}} बुकिंग, {{3}} वॉक-इन, {{4}} पूरे, {{5}} नहीं आए, औसत इंतज़ार {{6}} मिनट।", examples: ["डॉ. शर्मा क्लिनिक", "18", "9", "25", "2", "14"] },
+    en: { body: "Here is today's summary for {{1}}. Booked appointments: {{2}}. Walk-in patients: {{3}}. Consultations completed: {{4}}. Patients who did not come: {{5}}. Average waiting time: {{6}} minutes. Have a good evening.", examples: ["Dr. Sharma's Clinic", "18", "9", "25", "2", "14"] },
+    hi: { body: "आज का सारांश, {{1}}। बुक किए गए अपॉइंटमेंट: {{2}}। वॉक-इन मरीज़: {{3}}। पूरी हुई कंसल्टेशन: {{4}}। जो मरीज़ नहीं आए: {{5}}। औसत इंतज़ार का समय: {{6}} मिनट। शुभ संध्या।", examples: ["डॉ. शर्मा क्लिनिक", "18", "9", "25", "2", "14"] },
   },
   no_show_rebook: {
     en: { body: "We missed you today, {{1}} ji. Reply to book another time.", examples: ["Ramesh"], buttons: qr("Book again") },
