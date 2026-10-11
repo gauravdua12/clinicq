@@ -102,10 +102,26 @@ Across all 840 model calls: **0 failed calls**, and 5.8% escalated to Mistral La
 | 13 | Test tooling: UI test run deleted the UAT and load reports | Playwright empties its output folder | Playwright now writes to `test-results/ui/` only | ✅ |
 | 14 | One number flooding the server | — | Per-number rate limit: extra messages are acknowledged to Meta and dropped (logged `rate_limited`) | ✅ L6 |
 
+## Live server tests (11 Oct 2026, incolo-prod, https://q.incolo.si)
+Run on the production server against the real database, live Bedrock models (called from the server's IAM role) and the real Meta Cloud API. The repeatable part is `scripts/ops/live-check.ts` (15 checks); the infrastructure tests were run by hand.
+
+| Test | Result |
+|---|---|
+| Post-deploy check: webhook verify (right/wrong token), unsigned webhook refused, dev tools and simulator page off, live-AI booking (Hinglish, "for mother, named Sunita"), exact slot booked, name stored encrypted, no raw text in the DB, duplicate delivery processed once, 2-hour-old re-delivery not acted on, erasure via WhatsApp, booking released | ✅ 15/15 (repeated after every deploy) |
+| 10 patients at once through the live AI, each asking for a different slot | ✅ 10 × 15/15; app peak memory 183 MB, 1.3 GB still free; no errors; nothing left behind |
+| Database stopped mid-traffic | ✅ webhook 500 (Meta retries), app stays up; retried message processed exactly once after the DB returns |
+| Planned restart / app crash (kill -9) / HTTPS front-end crash | ✅ back in 3.1 s / 6.4 s / ~3 s |
+| Both AI models unavailable | ✅ booking still completes (rules fallback); `ai_models_unavailable` logged |
+| Switch ClinicQ → watsappai → ClinicQ (`demo-switch`) | ✅ 18 s / 8 s; each side verified from the internet |
+| Switch when ClinicQ can't start (real event: HTTPS front end misconfigured) | ✅ rolled back: watsappai restored automatically in 17 s |
+| Server reboot while ClinicQ is live | ✅ ClinicQ back in ~23 s, watsappai stays stopped, 15/15 after reboot |
+| From the internet | ✅ Let's Encrypt certificate (auto-renews), HTTP→HTTPS 308, HSTS/nosniff/no-referrer headers, API 401 without login |
+
+**Found and fixed on the live server:** staff OTP template missing its copy-code button parameter (Meta would reject every login code) · build fetched Google Fonts (now bundled) · settings folder not readable by the service user · Caddy log file created as root (the first switch rolled back correctly because of it) · the installer could execute a half-updated copy of itself during `update` · migration needed the database started while watsappai is live · erasure left a conversation-state row when the final WhatsApp confirmation couldn't be delivered (regression test added) · dev simulator page visible in production · 6 templates refused by Meta (too many variables per word / wrong category), now rewritten and pending.
+
 ## Not covered yet (needs real accounts)
-- A real round trip through Meta's Cloud API (WhatsApp Business Account + token for 9920323832). The mock implements the same API shapes, and `npm run meta -- check` / `send-test` are ready for it.
-- WhatsApp Flows on real phones (the slot-grid form). It is unit-tested with Meta's encryption scheme; the list-picker fallback is covered end to end.
-- Memory and throughput on the actual watsappai Linux server (the macOS numbers above are the reference).
+- A conversation from a real phone (9920323832 → Meta test number). Everything up to Meta is verified live; the last step needs a person to send a message.
+- WhatsApp Flows (slot-grid form): created and validated by Meta, but publishing needs business verification. Until then the bot uses the list picker (covered end to end).
 - Lawyer review of the privacy notice (planned at customer onboarding).
 
 ## Reproduce
