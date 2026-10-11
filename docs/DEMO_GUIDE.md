@@ -16,6 +16,8 @@ If the app you switch to doesn't come up healthy, the script puts the previous o
 - **Next:** 9654920201, connected through coexistence so the WhatsApp Business app keeps working on that phone (docs/META_ONBOARDING.md). After that, anyone can message it.
 
 ## 3. Show it
+Your number (9920323832) is the demo **presenter**: it's both a patient and the clinic's doctor. Plain messages go to the patient side. Desk commands start with **#**: `#next`, `#status`, `#add Ramesh`, `#late 15`, `#summary`. Send `#` alone to see them all.
+
 1. **Patient side:** from your phone, message the number "Hi", agree to the privacy notice, then type or say (voice note) something like *"kal shaam 6 baje mummy ke liye appointment"*.
 2. **Desk side:** open https://q.incolo.si/login and enter 9920323832. The login code arrives on WhatsApp. Until Meta approves the login-code template, it comes as a normal message, which requires that you messaged the bot in the last 24 hours (step 1 covers this).
 3. **The queue (today's patients):** book for *today* (e.g. *"aaj shaam 7 baje"*), then either reply *"I've reached"* from the phone or tap **Arrived** on the Appointments page. The patient joins the board as Waiting. Use **+ Add walk-in** for walk-ins. **Send next patient in**, then **✓ Consultation completed**. The patient gets "it's your turn" on WhatsApp. Open the waiting-room TV from Settings → **Walk-in QR & TV** → Open display.

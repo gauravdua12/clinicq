@@ -235,3 +235,28 @@ describe("time-shared demo server: Meta re-deliveries after downtime", () => {
     expect(h.wa.to(PATIENT).length).toBeGreaterThan(1); // fresh message → normal conversation
   });
 });
+
+describe("demo presenter: doctor and patient on one phone", () => {
+  it("plain messages go to the patient side, #commands to the desk; other staff unchanged", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    const prev = process.env.DEMO_PRESENTER_PHONES;
+    process.env.DEMO_PRESENTER_PHONES = "9999900002"; // the seeded staff member acts as presenter
+    try {
+      await h.say(SEED.staffPhone, "Hi");
+      const welcome = h.wa.last(SEED.staffPhone);
+      expect(welcome?.kind).toBe("buttons"); // privacy notice + "I agree"
+      expect(welcome?.kind === "buttons" && welcome.buttons.some((b) => b.id === "consent:yes")).toBe(true);
+      await h.say(SEED.staffPhone, "#status");
+      const snap = h.wa.last(SEED.staffPhone);
+      expect(snap?.kind === "text" && /Waiting|Next|consultation/i.test(snap.body)).toBe(true);
+      await h.say(SEED.staffPhone, "#");
+      const help = h.wa.last(SEED.staffPhone);
+      expect(help?.kind === "text" && help.body).toMatch(/#NEXT/);
+      process.env.DEMO_PRESENTER_PHONES = "";
+      await h.say(SEED.doctorPhone, "Hi"); // a real doctor's number: desk commands as before
+      expect(h.wa.last(SEED.doctorPhone)?.kind === "text" && (h.wa.last(SEED.doctorPhone) as { body: string }).body).toMatch(/^Commands:/);
+    } finally {
+      if (prev === undefined) delete process.env.DEMO_PRESENTER_PHONES; else process.env.DEMO_PRESENTER_PHONES = prev;
+    }
+  });
+});
