@@ -87,6 +87,7 @@ export async function buildApp(opts: BuildOpts): Promise<{ app: FastifyInstance;
           const path = decodeURIComponent(rel.replace(/\/+$/, "")) || "/";
           if (path.includes("..")) return reply.code(400).send();
           if (path === "/") return reply.sendFile("index.html");
+          if (!env.DEV_TOOLS && (path === "/dev" || path.startsWith("/dev/"))) return reply.code(404).sendFile("404.html"); // simulator page only with dev tools
           if (/\.[a-z0-9]+$/i.test(path) && existsSync(join(webOut, path))) return reply.sendFile(path.slice(1));
           if (existsSync(join(webOut, `${path}.html`))) return reply.sendFile(`${path.slice(1)}.html`);
           return reply.code(404).sendFile("404.html");

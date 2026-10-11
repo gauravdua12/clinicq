@@ -44,7 +44,7 @@ try {
   const ch = await (await fetch(`${BASE}/webhook?hub.mode=subscribe&hub.verify_token=${encodeURIComponent(process.env.META_VERIFY_TOKEN!)}&hub.challenge=abc123`)).text();
   check("webhook verify: right token echoes challenge", ch === "abc123");
   check("unsigned webhook refused", (await fetch(`${BASE}/webhook`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status === 401);
-  check("dev tools are off in production", (await fetch(`${BASE}/dev/clock`, { method: "POST" })).status === 404);
+  check("dev tools are off in production", (await fetch(`${BASE}/dev/clock`, { method: "POST" })).status === 404 && (await fetch(`${BASE}/dev/simulator`)).status === 404);
 
   // 2. A full booking through the live AI, answering whatever the bot asks next
   const first = `kal ${spoken} mummy ke liye appointment chahiye, unka naam Sunita hai`;
