@@ -1,0 +1,16 @@
+{
+  "name": "@clinicq/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "date-fns": "^4.4.0",
+    "date-fns-tz": "^3.2.0",
+    "pino": "^10.4.0",
+    "zod": "^4.6.5"
+  }
+}

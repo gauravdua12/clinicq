@@ -1,0 +1,425 @@
+// ClinicQ schema. LOGISTICS ONLY: read docs/DATA_POLICY.md §2 before adding any field.
+// Fields marked `enc` hold AES-256-GCM ciphertext produced by packages/db/src/crypto.ts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Clinic {
+  id               String      @id @default(cuid())
+  name             String
+  addressShort     String
+  addressFull      String
+  mapsUrl          String?
+  lat              Float?
+  lng              Float?
+  phone            String
+  code             String      @unique
+  noticeUrl        String
+  grievanceContact Json
+  settings         Json
+  displayKey       String      @unique
+  isDemo           Boolean     @default(false)
+  demoSource       Json?       // { website?, specialty?, extractedBy? } — public business info only
+  createdAt        DateTime    @default(now())
+  doctors          Doctor[]
+  staff            StaffUser[]
+}
+
+model Doctor {
+  id            String        @id @default(cuid())
+  clinicId      String
+  clinic        Clinic        @relation(fields: [clinicId], references: [id])
+  displayName   String
+  qualification String?
+  delayMinutes  Int           @default(0)
+  delayDate     DateTime?     @db.Date
+  pauseUntil    DateTime?
+  sessions      Session[]
+  closures      Closure[]
+  appointments  Appointment[]
+}
+
+model Session {
+  id          String  @id @default(cuid())
+  doctorId    String
+  doctor      Doctor  @relation(fields: [doctorId], references: [id])
+  weekday     Int
+  label       String
+  startTime   String
+  endTime     String
+  slotMinutes Int
+  walkinQuota Int
+  active      Boolean @default(true)
+
+  @@index([doctorId, weekday])
+}
+
+model Closure {
+  id          String   @id @default(cuid())
+  doctorId    String
+  doctor      Doctor   @relation(fields: [doctorId], references: [id])
+  date        DateTime @db.Date
+  sessionId   String?
+  label       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+}
+
+model BlockedSlot {
+  id          String   @id @default(cuid())
+  doctorId    String
+  slotStart   DateTime
+  createdById String?
+
+  @@unique([doctorId, slotStart])
+}
+
+model StaffUser {
+  id        String    @id @default(cuid())
+  clinicId  String
+  clinic    Clinic    @relation(fields: [clinicId], references: [id])
+  name      String
+  waPhone   String // enc
+  phoneHash String    @unique
+  role      StaffRole
+  onDuty    Boolean   @default(true)
+  active    Boolean   @default(true)
+}
+
+enum StaffRole {
+  DOCTOR
+  STAFF
+}
+
+model PatientAccount {
+  id                String           @id @default(cuid())
+  waPhone           String // enc
+  phoneHash         String           @unique
+  waProfileName     String? // enc
+  language          Lang             @default(en)
+  numberConfirmedAt DateTime?
+  optedOutAt        DateTime?
+  lastInboundAt     DateTime?
+  lastActivityAt    DateTime         @default(now())
+  keyVersion        Int              @default(1)
+  createdAt         DateTime         @default(now())
+  profiles          PatientProfile[]
+  consents          ConsentRecord[]
+}
+
+enum Lang {
+  en
+  hi
+  hinglish
+}
+
+model PatientProfile {
+  id           String          @id @default(cuid())
+  accountId    String?
+  account      PatientAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name         String // enc
+  relation     Relation        @default(SELF)
+  yearOfBirth  Int?
+  gender       Gender?
+  contactPhone String? // enc
+  createdAt    DateTime        @default(now())
+  appointments Appointment[]
+  queueEntries QueueEntry[]
+}
+
+enum Relation {
+  SELF
+  MOTHER
+  FATHER
+  SPOUSE
+  SON
+  DAUGHTER
+  SIBLING
+  GRANDPARENT
+  OTHER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNDISCLOSED
+}
+
+model ConsentRecord {
+  id            String         @id @default(cuid())
+  accountId     String
+  account       PatientAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  noticeVersion String
+  language      Lang
+  channel       String         @default("whatsapp")
+  givenAt       DateTime       @default(now())
+  withdrawnAt   DateTime?
+}
+
+model Appointment {
+  id                String          @id @default(cuid())
+  doctorId          String
+  doctor            Doctor          @relation(fields: [doctorId], references: [id])
+  profileId         String?
+  profile           PatientProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  sessionId         String
+  slotStart         DateTime
+  slotKey           String?         @unique
+  status            ApptStatus
+  holdExpiresAt     DateTime?
+  visitType         VisitType?
+  token             String?
+  source            ApptSource      @default(WHATSAPP)
+  feeStatus         FeeStatus       @default(NOT_REQUIRED)
+  rescheduledFromId String?
+  bookedAt          DateTime?
+  arrivedAt         DateTime?
+  cancelledAt       DateTime?
+  cancelledBy       CancelActor?
+  reminder24Sent    Boolean         @default(false)
+  reminderDaySent   Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  version           Int             @default(0)
+  queueEntry        QueueEntry?
+
+  @@index([doctorId, slotStart])
+  @@index([profileId, status])
+}
+
+enum ApptStatus {
+  HELD
+  BOOKED
+  ARRIVED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum VisitType {
+  NEW
+  FOLLOW_UP
+  REPORT_SHOW
+}
+
+enum ApptSource {
+  WHATSAPP
+  STAFF
+}
+
+enum FeeStatus {
+  NOT_REQUIRED
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum CancelActor {
+  PATIENT
+  CLINIC
+  SYSTEM
+}
+
+model QueueEntry {
+  id               String          @id @default(cuid())
+  doctorId         String
+  sessionId        String
+  date             DateTime        @db.Date
+  profileId        String?
+  profile          PatientProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  appointmentId    String?         @unique
+  appointment      Appointment?    @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  displayName      String? // enc (staff-added name-only walk-ins)
+  source           QueueSource
+  token            String
+  state            QueueState
+  arrivedAt        DateTime
+  slotStart        DateTime?
+  expectedAt       DateTime?
+  lateArrival      Boolean         @default(false)
+  manualRank       Float?
+  promotedAt       DateTime?
+  consultStartedAt DateTime?
+  completedAt      DateTime?
+  turnNearSentAt   DateTime?
+  version          Int             @default(0)
+
+  @@index([doctorId, date, sessionId, state])
+}
+
+enum QueueSource {
+  A
+  W
+}
+
+enum QueueState {
+  WAITING
+  NEXT
+  IN_CONSULT
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+model TokenCounter {
+  doctorId  String
+  date      DateTime @db.Date
+  sessionId String
+  series    String
+  value     Int      @default(0)
+
+  @@id([doctorId, date, sessionId, series])
+}
+
+model WalkinOverflowRequest {
+  id           String         @id @default(cuid())
+  doctorId     String
+  sessionId    String
+  date         DateTime       @db.Date
+  profileId    String
+  accountId    String?
+  status       OverflowStatus @default(PENDING)
+  decidedById  String?
+  decidedAt    DateTime?
+  assignedTime DateTime?
+  endOfQueue   Boolean        @default(false)
+  awaitingTimeFromId String?
+  createdAt    DateTime       @default(now())
+  expiresAt    DateTime
+}
+
+enum OverflowStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  TIMED_OUT
+}
+
+model DailyWalkinCode {
+  clinicId String
+  date     DateTime @db.Date
+  code     String
+
+  @@id([clinicId, date])
+}
+
+model FollowUp {
+  id                  String    @id @default(cuid())
+  profileId           String
+  doctorId            String
+  dueDate             DateTime  @db.Date
+  remindedAt          DateTime?
+  bookedAppointmentId String?
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  appointmentId   String?  @unique
+  provider        String
+  providerOrderId String   @unique
+  amountPaise     Int
+  status          String
+  refundId        String?
+  createdAt       DateTime @default(now())
+}
+
+model ConversationState {
+  accountId String   @id
+  state     String
+  context   Json
+  expiresAt DateTime
+  updatedAt DateTime @updatedAt
+}
+
+model FlowToken {
+  token     String   @id
+  accountId String
+  profileId String?
+  expiresAt DateTime
+}
+
+model ProcessedMessage {
+  wamid      String   @id
+  receivedAt DateTime @default(now())
+}
+
+model MessageLog {
+  id        String    @id @default(cuid())
+  accountId String?
+  direction Direction
+  kind      String
+  wamid     String?   @unique
+  status    String?
+  errorCode Int?
+  createdAt DateTime  @default(now())
+
+  @@index([accountId, createdAt])
+}
+
+enum Direction {
+  IN
+  OUT
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorType String
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  diff      Json?
+  at        DateTime @default(now())
+
+  @@index([at])
+}
+
+model DataRequest {
+  id          String   @id @default(cuid())
+  accountHash String
+  type        String
+  status      String
+  at          DateTime @default(now())
+}
+
+model StaffSession {
+  id        String   @id
+  staffId   String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model OtpChallenge {
+  phoneHash String   @id
+  codeHash  String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+}
+
+// Admin-only runtime configuration (e.g. "ai": language-model selection). Audit-logged.
+model SystemConfig {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+model ScheduledJob {
+  id        String   @id @default(cuid())
+  name      String
+  data      Json
+  runAt     DateTime
+  key       String?  @unique
+  doneAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([doneAt, runAt])
+}

@@ -1,0 +1,75 @@
+{
+  "promptVersion": "2026-10-10.1",
+  "summary": {
+    "model": "bedrock:openai.gpt-oss-20b-1:0",
+    "cases": 1,
+    "validPct": 100,
+    "allFieldsPct": 100,
+    "criticalPct": 100,
+    "intentPct": 100,
+    "medicalRecallPct": null,
+    "medicalFalsePosPct": 0,
+    "emergencyRecallPct": null,
+    "emergencyFalsePosPct": null,
+    "p50ms": 3561,
+    "p95ms": 3561,
+    "avgInTok": 1762,
+    "avgOutTok": 175,
+    "usdPer1kMsgs": 0.202,
+    "inrPerMsg": 0.018,
+    "fieldAcc": {
+      "intent": 100,
+      "date": 100,
+      "partOfDay": 100,
+      "forWhom": 100,
+      "profileRef": 100
+    },
+    "byCat": {
+      "book": 100
+    },
+    "errors": [],
+    "failures": []
+  },
+  "results": [
+    {
+      "id": "b01",
+      "cat": "book",
+      "valid": true,
+      "latencyMs": 3560.511042,
+      "inTok": 1762,
+      "outTok": 175,
+      "costUsd": 0.00020221,
+      "fields": {
+        "intent": true,
+        "date": true,
+        "partOfDay": true,
+        "forWhom": true,
+        "profileRef": true
+      },
+      "allOk": true,
+      "criticalOk": true,
+      "medExpected": false,
+      "medGot": false,
+      "emgGot": false,
+      "got": {
+        "intent": "BOOK",
+        "date": "2026-10-10",
+        "time": null,
+        "timeQualifier": null,
+        "partOfDay": "evening",
+        "forWhom": "existing_profile",
+        "profileRef": "P2",
+        "newPersonName": null,
+        "relation": "MOTHER",
+        "selfName": null,
+        "phone": null,
+        "visitType": null,
+        "clinicInfoTopic": null,
+        "language": "en",
+        "hasNonBookingContent": false,
+        "possibleEmergency": false,
+        "confidence": 0.95
+      }
+    }
+  ]
+}

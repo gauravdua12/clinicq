@@ -1,0 +1,27 @@
+[Unit]
+Description=ClinicQ (WhatsApp clinic assistant)
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
+
+[Service]
+User=clinicq
+Group=clinicq
+WorkingDirectory=/opt/clinicq/app
+EnvironmentFile=/etc/clinicq/clinicq.env
+ExecStart=/usr/bin/node-24 --max-old-space-size=384 apps/server/dist/main.js
+Restart=always
+RestartSec=3
+# Stay a good neighbour on the shared box: watsappai keeps priority if memory gets tight.
+MemoryHigh=550M
+MemoryMax=700M
+OOMScoreAdjust=300
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/clinicq
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

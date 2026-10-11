@@ -1,0 +1,13 @@
+!.env.example
+*.log
+.env
+.env.*
+.flow-dev-keys/
+.next/
+apps/server/public/
+coverage/
+dist/
+node_modules/
+out/
+packages/db/src/generated/
+/test-results/

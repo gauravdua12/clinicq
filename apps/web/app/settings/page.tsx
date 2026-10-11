@@ -1,0 +1,231 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { api, ApiError, BASE } from "@/lib/api";
+import { Shell } from "@/lib/Shell";
+
+type Tab = "clinic" | "sessions" | "closures" | "staff" | "model" | "qr";
+const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+export default function Settings() {
+  const [tab, setTab] = useState<Tab>("clinic");
+  const tabs: [Tab, string][] = [["clinic", "Clinic"], ["sessions", "Sessions"], ["closures", "Holidays & leave"], ["staff", "Staff"], ["model", "Language model"], ["qr", "Walk-in QR & TV"]];
+  return (
+    <Shell active="/settings">
+      <h1>Settings</h1>
+      <div className="tabs">{tabs.map(([k, l]) => <button key={k} className={tab === k ? "active" : ""} onClick={() => setTab(k)}>{l}</button>)}</div>
+      {tab === "clinic" && <ClinicTab />}
+      {tab === "sessions" && <SessionsTab />}
+      {tab === "closures" && <ClosuresTab />}
+      {tab === "staff" && <StaffTab />}
+      {tab === "model" && <ModelTab />}
+      {tab === "qr" && <QrTab />}
+    </Shell>
+  );
+}
+
+function useSaved() {
+  const [state, setState] = useState<{ ok?: string; err?: string }>({});
+  return { state, ok: (m = "Saved") => setState({ ok: m }), err: (m: string) => setState({ err: m }), clear: () => setState({}) };
+}
+
+interface ClinicData { name: string; addressShort: string; addressFull: string; mapsUrl: string | null; phone: string; doctorName: string; qualification: string | null; settings: Record<string, unknown> & { fees?: string; windowDays?: number; cutoffMinutes?: number; walkinOverflowTimeoutMinutes?: number; turnNearThreshold?: number; flowsEnabled?: boolean } }
+
+function ClinicTab() {
+  const [d, setD] = useState<ClinicData | null>(null);
+  const s = useSaved();
+  useEffect(() => { api<ClinicData>("/api/settings/clinic").then(setD); }, []);
+  if (!d) return <p className="muted">Loading…</p>;
+  const set = (k: keyof ClinicData, v: unknown) => { setD({ ...d, [k]: v } as ClinicData); s.clear(); };
+  const setS = (k: string, v: unknown) => { setD({ ...d, settings: { ...d.settings, [k]: v } }); s.clear(); };
+  return (
+    <div className="card" style={{ maxWidth: 640 }}>
+      <label>Clinic name</label><input value={d.name} onChange={(e) => set("name", e.target.value)} />
+      <label>Doctor display name</label><input value={d.doctorName} onChange={(e) => set("doctorName", e.target.value)} />
+      <label>Qualification line</label><input value={d.qualification ?? ""} onChange={(e) => set("qualification", e.target.value)} />
+      <label>Short address (shown in confirmations)</label><input value={d.addressShort} onChange={(e) => set("addressShort", e.target.value)} />
+      <label>Full address</label><input value={d.addressFull} onChange={(e) => set("addressFull", e.target.value)} />
+      <label>Google Maps link</label><input value={d.mapsUrl ?? ""} onChange={(e) => set("mapsUrl", e.target.value || null)} />
+      <label>Clinic phone (shown to patients)</label><input value={d.phone} onChange={(e) => set("phone", e.target.value)} />
+      <label>Fees text</label><input value={d.settings.fees ?? ""} onChange={(e) => setS("fees", e.target.value)} placeholder="₹600 (follow-up within 7 days ₹300)" />
+      <div className="row" style={{ marginTop: 6 }}>
+        <div style={{ flex: 1 }}><label>Book up to (days ahead)</label><input type="number" value={d.settings.windowDays ?? 7} onChange={(e) => setS("windowDays", Number(e.target.value))} /></div>
+        <div style={{ flex: 1 }}><label>Booking cut-off (minutes before)</label><input type="number" value={d.settings.cutoffMinutes ?? 60} onChange={(e) => setS("cutoffMinutes", Number(e.target.value))} /></div>
+      </div>
+      <div className="row">
+        <div style={{ flex: 1 }}><label>Walk-in staff reply timeout (min)</label><input type="number" value={d.settings.walkinOverflowTimeoutMinutes ?? 5} onChange={(e) => setS("walkinOverflowTimeoutMinutes", Number(e.target.value))} /></div>
+        <div style={{ flex: 1 }}><label>"Turn near" alert when ahead ≤</label><input type="number" value={d.settings.turnNearThreshold ?? 2} onChange={(e) => setS("turnNearThreshold", Number(e.target.value))} /></div>
+      </div>
+      <label><input type="checkbox" style={{ width: "auto", minHeight: 0 }} checked={d.settings.flowsEnabled !== false} onChange={(e) => setS("flowsEnabled", e.target.checked)} /> Use the WhatsApp booking form when no slot is near the requested time</label>
+      <button className="primary" style={{ marginTop: 14 }} onClick={async () => {
+        try { await api("/api/settings/clinic", { method: "PUT", body: { name: d.name, addressShort: d.addressShort, addressFull: d.addressFull, mapsUrl: d.mapsUrl, phone: d.phone, doctorName: d.doctorName, qualification: d.qualification, settings: d.settings } }); s.ok(); }
+        catch { s.err("Couldn't save. Check the fields."); }
+      }}>Save</button>
+      {s.state.ok && <div className="ok">{s.state.ok}</div>}{s.state.err && <div className="err">{s.state.err}</div>}
+    </div>
+  );
+}
+
+interface Sess { weekday: number; label: string; startTime: string; endTime: string; slotMinutes: number; walkinQuota: number; active?: boolean }
+
+function SessionsTab() {
+  const [rows, setRows] = useState<Sess[]>([]);
+  const s = useSaved();
+  useEffect(() => { api<Sess[]>("/api/settings/sessions").then((r) => setRows(r.filter((x) => x.active !== false))); }, []);
+  const upd = (i: number, k: keyof Sess, v: string | number) => { setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r))); s.clear(); };
+  return (
+    <div className="card">
+      <p className="small muted">Each row is one weekly session. Slots are generated from the start time in steps of the slot length.</p>
+      <table>
+        <thead><tr><th>Day</th><th>Label</th><th>Start</th><th>End</th><th>Slot (min)</th><th>Walk-in quota</th><th /></tr></thead>
+        <tbody>{rows.map((r, i) => (
+          <tr key={i}>
+            <td><select value={r.weekday} onChange={(e) => upd(i, "weekday", Number(e.target.value))}>{WD.map((w, k) => <option key={k} value={k}>{w}</option>)}</select></td>
+            <td><input value={r.label} onChange={(e) => upd(i, "label", e.target.value)} /></td>
+            <td><input type="time" value={r.startTime} onChange={(e) => upd(i, "startTime", e.target.value)} /></td>
+            <td><input type="time" value={r.endTime} onChange={(e) => upd(i, "endTime", e.target.value)} /></td>
+            <td><input type="number" value={r.slotMinutes} onChange={(e) => upd(i, "slotMinutes", Number(e.target.value))} /></td>
+            <td><input type="number" value={r.walkinQuota} onChange={(e) => upd(i, "walkinQuota", Number(e.target.value))} /></td>
+            <td><button className="ghost warn" onClick={() => setRows(rows.filter((_, j) => j !== i))}>Remove</button></td>
+          </tr>
+        ))}</tbody>
+      </table>
+      <div className="row" style={{ marginTop: 10 }}>
+        <button onClick={() => setRows([...rows, { weekday: 1, label: "Morning", startTime: "10:00", endTime: "13:00", slotMinutes: 15, walkinQuota: 10 }])}>+ Add session</button>
+        <button className="primary" onClick={async () => {
+          try { await api("/api/settings/sessions", { method: "PUT", body: rows.map(({ weekday, label, startTime, endTime, slotMinutes, walkinQuota }) => ({ weekday, label, startTime, endTime, slotMinutes, walkinQuota })) }); s.ok(); }
+          catch (e) { s.err(e instanceof ApiError && e.code === "overlap" ? "Two sessions on the same day overlap." : e instanceof ApiError && e.code === "end_before_start" ? "End time must be after start time." : "Couldn't save."); }
+        }}>Save sessions</button>
+      </div>
+      {s.state.ok && <div className="ok">{s.state.ok}</div>}{s.state.err && <div className="err">{s.state.err}</div>}
+    </div>
+  );
+}
+
+function ClosuresTab() {
+  const [rows, setRows] = useState<{ id: string; date: string; sessionId: string | null; label: string | null }[]>([]);
+  const [date, setDate] = useState("");
+  const [labelText, setLabel] = useState("Holiday");
+  const [pending, setPending] = useState<number | null>(null);
+  const s = useSaved();
+  const load = useCallback(() => api<typeof rows>("/api/settings/closures").then(setRows), []);
+  useEffect(() => { void load(); }, [load]);
+  return (
+    <div className="card" style={{ maxWidth: 640 }}>
+      <div className="row">
+        <div style={{ flex: 1 }}><label>Date</label><input type="date" value={date} onChange={(e) => { setDate(e.target.value); setPending(null); }} /></div>
+        <div style={{ flex: 1 }}><label>Reason (shown to staff only)</label><input value={labelText} onChange={(e) => setLabel(e.target.value)} /></div>
+      </div>
+      {pending === null ? (
+        <button style={{ marginTop: 10 }} onClick={async () => { if (!date) return s.err("Pick a date."); const r = await api<{ affectedAppointments: number }>("/api/settings/closures", { body: { date, label: labelText } }); setPending(r.affectedAppointments); }}>Close this day</button>
+      ) : (
+        <div className="banner" style={{ marginTop: 10 }}>
+          {pending ? `${pending} appointment(s) on this day will be cancelled and each patient told on WhatsApp.` : "No appointments on this day."}
+          <div className="row" style={{ marginTop: 8 }}>
+            <button className="primary" onClick={async () => { await api("/api/settings/closures", { body: { date, label: labelText, confirm: true } }); setPending(null); setDate(""); s.ok("Day closed"); void load(); }}>Confirm closure</button>
+            <button className="ghost" onClick={() => setPending(null)}>Back</button>
+          </div>
+        </div>
+      )}
+      {s.state.ok && <div className="ok">{s.state.ok}</div>}{s.state.err && <div className="err">{s.state.err}</div>}
+      <h2 style={{ marginTop: 18 }}>Upcoming closures</h2>
+      {rows.length === 0 && <p className="muted small">None</p>}
+      {rows.map((r) => <div key={r.id} className="row" style={{ justifyContent: "space-between", borderBottom: "1px solid var(--border)", padding: "6px 0" }}><span>{r.date.slice(0, 10)} · {r.label ?? "Closed"}{r.sessionId ? " (one session)" : ""}</span><button className="ghost warn" onClick={async () => { await api(`/api/settings/closures/${r.id}`, { method: "DELETE" }); void load(); }}>Remove</button></div>)}
+    </div>
+  );
+}
+
+function StaffTab() {
+  const [rows, setRows] = useState<{ id: string; name: string; role: string; onDuty: boolean; active: boolean; phone: string }[]>([]);
+  const [name, setName] = useState(""); const [phone, setPhone] = useState(""); const [role, setRole] = useState("STAFF");
+  const s = useSaved();
+  const load = useCallback(() => api<typeof rows>("/api/settings/staff").then(setRows), []);
+  useEffect(() => { void load(); }, [load]);
+  return (
+    <div className="card" style={{ maxWidth: 720 }}>
+      <table><thead><tr><th>Name</th><th>WhatsApp</th><th>Role</th><th>On duty</th><th /></tr></thead>
+        <tbody>{rows.map((r) => (
+          <tr key={r.id} style={{ opacity: r.active ? 1 : 0.5 }}>
+            <td>{r.name}</td><td>{r.phone}</td><td>{r.role === "DOCTOR" ? "Doctor (admin)" : "Staff"}</td>
+            <td><input type="checkbox" style={{ width: "auto", minHeight: 0 }} checked={r.onDuty} onChange={async (e) => { await api(`/api/settings/staff/${r.id}`, { method: "PATCH", body: { onDuty: e.target.checked } }); void load(); }} /></td>
+            <td><button className="ghost small" onClick={async () => { await api(`/api/settings/staff/${r.id}`, { method: "PATCH", body: { active: !r.active } }); void load(); }}>{r.active ? "Deactivate" : "Activate"}</button></td>
+          </tr>
+        ))}</tbody></table>
+      <h2 style={{ marginTop: 16 }}>Add staff</h2>
+      <div className="row">
+        <input style={{ flex: 2 }} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+        <input style={{ flex: 2 }} placeholder="WhatsApp number" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <select style={{ flex: 1 }} value={role} onChange={(e) => setRole(e.target.value)}><option value="STAFF">Staff</option><option value="DOCTOR">Doctor (admin)</option></select>
+        <button className="primary" onClick={async () => { try { await api("/api/settings/staff", { body: { name, phone, role } }); setName(""); setPhone(""); s.ok("Added"); void load(); } catch { s.err("Check the name and 10-digit number."); } }}>Add</button>
+      </div>
+      {s.state.ok && <div className="ok">{s.state.ok}</div>}{s.state.err && <div className="err">{s.state.err}</div>}
+    </div>
+  );
+}
+
+interface CatalogModel { spec: string; label: string; openWeight: boolean; residency: string; inPerM: number | null; outPerM: number | null; tier: string }
+interface AiCfg { primary: string; escalation: string; minConfidence: number; timeoutMs: number; stt: string; sttFallback: string }
+interface Smoke { passed: number; total: number; safetyMisses: string[]; failures: string[]; avgMs: number }
+
+function ModelTab() {
+  const [cfg, setCfg] = useState<AiCfg | null>(null);
+  const [catalog, setCatalog] = useState<CatalogModel[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<{ ok?: boolean; reason?: string; smoke?: Smoke } | null>(null);
+  useEffect(() => { api<{ config: AiCfg; catalog: CatalogModel[] }>("/api/settings/ai").then((r) => { setCfg(r.config); setCatalog(r.catalog); }); }, []);
+  if (!cfg) return <p className="muted">Loading…</p>;
+  const opt = (m: CatalogModel) => <option key={m.spec} value={m.spec}>{m.label} · {m.residency === "in" ? "India" : m.residency} · ${m.inPerM}/${m.outPerM} per M</option>;
+  return (
+    <div className="card" style={{ maxWidth: 720 }}>
+      <p className="small muted">Understands patients' free-text and voice messages (booking details only). The primary model handles every message; when it is unsure, the failover model double-checks. Before a change is saved, a live test of 12 messages runs; it must catch every emergency and health-detail case.</p>
+      <label>Primary model (every message)</label>
+      <select value={cfg.primary} onChange={(e) => { setCfg({ ...cfg, primary: e.target.value }); setResult(null); }}>
+        <option value="rules">Built-in rules only (no AI)</option>
+        {catalog.map(opt)}
+      </select>
+      <label>Failover model (when the primary is unsure or fails)</label>
+      <select value={cfg.escalation} onChange={(e) => { setCfg({ ...cfg, escalation: e.target.value }); setResult(null); }}>
+        <option value="">None</option>
+        {catalog.map(opt)}
+      </select>
+      <label>Custom model spec (optional, e.g. openai-compat:qwen3-32b for a self-hosted server)</label>
+      <input placeholder="leave empty to use the selections above" onBlur={(e) => e.target.value && setCfg({ ...cfg, primary: e.target.value })} />
+      <div className="row">
+        <div style={{ flex: 1 }}><label>Failover when confidence below</label><input type="number" step="0.05" min={0} max={1} value={cfg.minConfidence} onChange={(e) => setCfg({ ...cfg, minConfidence: Number(e.target.value) })} /></div>
+        <div style={{ flex: 1 }}><label>Timeout (ms)</label><input type="number" value={cfg.timeoutMs} onChange={(e) => setCfg({ ...cfg, timeoutMs: Number(e.target.value) })} /></div>
+      </div>
+      <label>Voice notes (speech-to-text)</label>
+      <select value={cfg.stt} onChange={(e) => setCfg({ ...cfg, stt: e.target.value })}>
+        <option value="voxtral-small">Voxtral Small 24B (Bedrock, India)</option><option value="voxtral-mini">Voxtral Mini 3B (Bedrock, India)</option><option value="transcribe">Amazon Transcribe (India)</option><option value="sarvam">Sarvam AI</option><option value="openai-compat">Self-hosted Whisper</option><option value="mock">Simulator (dev)</option>
+      </select>
+      <button className="primary" style={{ marginTop: 14 }} disabled={saving} onClick={async () => {
+        setSaving(true); setResult(null);
+        try { const r = await api<{ saved: boolean; smoke?: Smoke }>("/api/settings/ai", { method: "PUT", body: cfg }); setResult({ ok: r.saved, smoke: r.smoke }); }
+        catch (e) { const b = (e as ApiError).body as { reason?: string; smoke?: Smoke }; setResult({ ok: false, reason: b?.reason, smoke: b?.smoke }); }
+        finally { setSaving(false); }
+      }}>{saving ? "Testing the model…" : "Test & save"}</button>
+      {result?.ok && <div className="ok">Saved. Live test: {result.smoke ? `${result.smoke.passed}/${result.smoke.total} passed, avg ${result.smoke.avgMs} ms` : "skipped"}.</div>}
+      {result && !result.ok && <div className="err">Not saved{result.reason === "smoke_failed" && result.smoke ? `: live test ${result.smoke.passed}/${result.smoke.total}${result.smoke.safetyMisses.length ? `, missed safety cases ${result.smoke.safetyMisses.join(", ")}` : ""}.` : result.reason ? `: ${result.reason}` : "."}</div>}
+    </div>
+  );
+}
+
+function QrTab() {
+  const [qr, setQr] = useState<{ text: string; url: string; png: string } | null>(null);
+  const [key, setKey] = useState<string | null>(null);
+  useEffect(() => { api<typeof qr>("/api/settings/qr").then(setQr); api<{ key: string }>("/api/settings/display-key").then((r) => setKey(r.key)).catch(() => undefined); }, []);
+  return (
+    <div className="row" style={{ alignItems: "flex-start" }}>
+      <div className="card" style={{ maxWidth: 360 }}>
+        <h2>Today's walk-in QR</h2>
+        <p className="small muted">Print or show at reception. The code changes every midnight so nobody can join the queue from home.</p>
+        {qr && <><img src={qr.png} alt="Walk-in QR code" style={{ width: "100%", background: "#fff", borderRadius: 8 }} /><p className="small">Message: <code>{qr.text}</code></p><button onClick={() => window.print()}>Print</button></>}
+      </div>
+      {key && <div className="card" style={{ maxWidth: 360 }}>
+        <h2>Waiting-room TV</h2>
+        <p className="small muted">Open this link on the TV browser in full screen. It shows tokens only (first names if enabled).</p>
+        <a href={`${BASE}/display?key=${encodeURIComponent(key)}`} target="_blank">Open display</a>
+      </div>}
+    </div>
+  );
+}

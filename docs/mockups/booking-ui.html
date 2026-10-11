@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClinicQ booking mockups</title>
+<style>
+:root{--bg:#f4f3ef;--card:#ffffff;--chat:#efeae2;--text:#1f1f1d;--muted:#6b6a65;--border:#d9d7cf;--accent:#185fa5;--accent-bg:#e6f1fb;--me:#d9fdd3;--me-text:#0b3d1e;--staff:#faeeda;--staff-text:#633806;--ok:#3b6d11}
+@media (prefers-color-scheme: dark){:root{--bg:#1b1b1a;--card:#262624;--chat:#1f2c24;--text:#ecebe6;--muted:#a3a29c;--border:#3b3a37;--accent:#85b7eb;--accent-bg:#0c447c;--me:#005c4b;--me-text:#e7fff3;--staff:#633806;--staff-text:#faeeda;--ok:#97c459}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:24px 16px}
+main{max-width:1000px;margin:0 auto}
+h1{font-size:22px;font-weight:600;margin:0 0 4px}
+h2{font-size:18px;font-weight:600;margin:32px 0 8px}
+p.lead{color:var(--muted);margin:0 0 16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+.ph{background:var(--chat);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;border:1px solid var(--border)}
+.hd{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600}
+.tag{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--accent-bg);color:var(--accent)}
+.b{max-width:88%;padding:7px 10px;border-radius:10px;font-size:13.5px;line-height:1.5;white-space:pre-line}
+.bot{background:var(--card);align-self:flex-start}
+.me{background:var(--me);color:var(--me-text);align-self:flex-end}
+.st{background:var(--staff);color:var(--staff-text);align-self:flex-start}
+.btn{display:block;text-align:center;color:var(--accent);border-top:1px solid var(--border);padding:6px 0 2px;margin-top:6px;white-space:normal}
+.chip{display:inline-block;font-size:12px;padding:4px 9px;border-radius:6px;border:1px solid var(--border);margin:2px}
+.on{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
+.off{color:var(--muted);text-decoration:line-through}
+.row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--border)}
+.note{font-size:12.5px;color:var(--muted)}
+.sys{align-self:center;font-size:11.5px;color:var(--muted);background:var(--card);padding:3px 10px;border-radius:6px;border:1px solid var(--border)}
+.who{font-size:11px;color:var(--muted);margin-bottom:-4px}
+.chat{max-width:460px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
+.tabs button{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer}
+.tabs button.act{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
+.decision{border:2px solid var(--ok);border-radius:12px;padding:10px 14px;background:var(--card);margin:8px 0 16px;font-size:14px}
+</style>
+</head>
+<body>
+<main>
+<h1>ClinicQ booking mockups (approved)</h1>
+<p class="lead">This is the reference for the booking UI and conversation tone. See docs/CONVERSATION_GUIDE.md for the exact copy IDs.</p>
+
+<div class="decision"><strong>Approved slot display:</strong> use <strong>E (smart suggest)</strong> when free slots are on or near the requested time. Otherwise, or when the patient taps "See all slots", show <strong>D (booking form, WhatsApp Flow)</strong>. <strong>C (list picker)</strong> is the fallback when a Flow can't be opened. Tone: mirror the patient (EN / HI / Hinglish).</div>
+
+<h2>Slot display forms</h2>
+<div class="grid">
+  <div class="ph">
+    <div class="hd"><span>E: Smart suggest (primary)</span><span class="tag">Used first</span></div>
+    <div class="b me">kal shaam 6 baje ke aas paas mummy ke liye</div>
+    <div class="b bot">Sure! For Sunita ji, tomorrow (Sat 11 Oct) evening, closest to 6 PM:<span class="btn">5:50 PM</span><span class="btn">6:10 PM</span><span class="btn">See all slots</span></div>
+    <div class="b me">6:10 PM</div>
+    <div class="note">The 2 nearest free slots within ±60 min of the requested time. The patient can also type a time.</div>
+  </div>
+  <div class="ph">
+    <div class="hd"><span>D: Booking form (Flow)</span><span class="tag">When nothing is near</span></div>
+    <div class="b bot">Tomorrow around 6 PM is fully booked, sorry. Please pick any free date and time here 👇<span class="btn">Choose date &amp; time</span></div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px">
+      <div class="note" style="margin-bottom:4px">Date</div>
+      <span class="chip">Fri 10</span><span class="chip on">Sat 11</span><span class="chip off">Sun 12</span><span class="chip">Mon 13</span><span class="chip">Tue 14</span>
+      <div class="note" style="margin:8px 0 4px">Evening</div>
+      <span class="chip off">5:10</span><span class="chip off">5:30</span><span class="chip off">5:50</span><span class="chip off">6:10</span><span class="chip off">6:30</span><span class="chip off">6:50</span><span class="chip off">7:10</span><span class="chip on">7:30</span>
+      <div style="margin-top:10px;text-align:center;font-size:13px;padding:6px;border-radius:8px;background:var(--me);color:var(--me-text)">Continue</div>
+    </div>
+    <div class="note">Live slots from the Flow endpoint. Rechecked on Continue; if the slot was just taken, it shows an inline error.</div>
+  </div>
+  <div class="ph">
+    <div class="hd"><span>C: List picker (fallback)</span></div>
+    <div class="b bot">Pick a time for Sunita ji:<span class="btn">View slots</span></div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 10px">
+      <div class="note">Evening · Sat 11 Oct</div>
+      <div class="row"><span>7:30 PM</span></div>
+      <div class="note" style="margin-top:6px">Morning · Mon 13 Oct</div>
+      <div class="row"><span>10:00 AM</span></div><div class="row" style="border:0"><span>10:20 AM</span></div>
+    </div>
+    <div class="note">Up to 10 rows. Used if the Flow fails or can't be opened on the patient's phone.</div>
+  </div>
+</div>
+
+<h2>Sample conversations (approved)</h2>
+<div class="tabs" id="tabs"></div>
+<div class="ph chat" id="chat"></div>
+</main>
+<script>
+const S=[
+{n:"S1 New patient booking",m:[["p","Hi, I want to book appointment"],["b","Hello! 👋 I'm the appointment assistant for Dr. Sharma's Clinic. I can help you book, reschedule or check your turn. Medical advice is given by Doctor during your consultation.\n\nBefore we start: we save only your name, number and appointment details to manage your visit. Privacy notice: drsharma.in/privacy",["I agree, continue"]],["p","I agree, continue"],["b","Thank you, Ramesh ji. I'll book this with your number +91 98765 43210. Is that okay?",["Use +91 98765 43210","Different number"]],["p","Use +91 98765 43210"],["b","Is this appointment for you or someone else?",["For me","Someone else"]],["p","for my mother, Sunita"],["b","Got it, booking for Sunita ji. Which day and time suits you? You can type something like \"tomorrow evening\" or \"Monday 11 am\"."],["p","kal shaam 6 baje ke aas paas"],["b","For tomorrow (Sat 11 Oct) evening, closest to 6 PM:",["5:50 PM","6:10 PM","See all slots"]],["p","6:10 PM"],["b","Is this a new consultation or a follow-up?",["New consultation","Follow-up","Show reports"]],["p","New consultation"],["b","Confirmed ✅\n\nSunita ji\nSat 11 Oct, 6:10 PM\nToken A-4\n📍 Dr. Sharma's Clinic, Sector 15\nmaps.app.goo.gl/xyz\n\nI'll remind you a day before. Reply anytime to reschedule or cancel.",["Reschedule","Cancel"]]]},
+{n:"S2 Returning + reminder",m:[["p","Hi, need appointment Monday morning"],["b","Welcome back, Ramesh ji. Is this for you or Sunita ji?",["For me","Sunita ji","Someone else"]],["p","For me"],["b","Monday (13 Oct) morning, I have:",["10:20 AM","10:40 AM","See all slots"]],["p","10:40"],["b","Done ✅ Ramesh ji, Mon 13 Oct, 10:40 AM, Token A-3. See you then."],["sys","Sunday 10:40 AM: automatic reminder"],["b","Reminder: Ramesh ji, your appointment with Dr. Sharma is tomorrow, Mon 13 Oct at 10:40 AM (Token A-3).",["Confirm","Reschedule","Cancel"]],["p","Reschedule"],["b","No problem. Which day and time would you prefer?"],["p","same day but evening"],["b","Monday evening, I have:",["5:30 PM","6:30 PM","See all slots"]],["p","6:30 PM"],["b","Moved ✅ Ramesh ji, Mon 13 Oct, 6:30 PM, Token A-5. The 10:40 AM slot is released."]]},
+{n:"S3 Walk-in, quota full",m:[["sys","Patient scans the QR code at reception"],["p","WALKIN DRS-4821"],["b","Welcome to Dr. Sharma's Clinic 🙏 I'll register you with +91 99887 76655. May I have the patient's name?",["Use this number","Different number"]],["p","Anil Verma"],["b","Thanks, Anil ji. Today's walk-in slots are full, so let me check with the reception team. One moment please 🙏"],["sys","Same moment, on staff WhatsApp and dashboard"],["s","Walk-in quota full for the Evening session. Anil Verma (+91 99887 xxxxx) is at reception. Can you adjust?",["Yes, adjust","No"]],["s","Yes, adjust"],["s","Which time should I give? Type a time (e.g. 7:40 PM) or choose:",["End of queue","7:40 PM"]],["s","7:50 PM"],["sys","Back on the patient's chat"],["b","Good news, Anil ji. The clinic has made space for you.\n\nToken W-12, around 7:50 PM\n6 patients ahead of you.\n\nI'll message you when your turn is near.",["Check my status"]],["sys","If staff had tapped No (or no reply in 5 min):"],["b","Sorry Anil ji, today's walk-in list is full. The next available appointments are:",["Tomorrow 10:20 AM","Tomorrow 11:00 AM","See all slots"]]]},
+{n:"S4 Status + alerts",m:[["p","mera number kab aayega?"],["b","Abhi Doctor ke saath: A-8\nAapka token: W-7, aapse pehle 3 patients\nAndazan wait: lagbhag 20 min"],["sys","Automatic, when 2 are ahead"],["b","Anil ji, aapki baari jaldi aane wali hai. Aapse pehle 2 patients (lagbhag 12 min). Reception ke paas rahiye."],["sys","Doctor sends LATE 15"],["b","Update: Doctor lagbhag 15 minute late chal rahe hain. Aapka naya andazan time 7:25 PM ke aas paas hai. Dhanyavaad 🙏"],["sys","Staff taps Consultation completed"],["b","Anil ji, aap agle hain. Cabin mein jaane ke liye taiyaar rahiye."],["b","Ab aapki baari hai 🙏 Doctor ke cabin mein aaiye."]]},
+{n:"S5 Voice + health details",m:[["p","[Voice note 0:18]"],["sys","Transcribed in memory, then deleted; booking details only"],["b","Thank you, Ramesh ji. I understood you'd like an appointment for tomorrow morning. Any health concerns are best discussed with Doctor during your visit, so I haven't saved those.\n\nTomorrow (Sat 11 Oct) morning, I have:",["10:20 AM","11:00 AM","See all slots"]],["p","I have fever since 3 days and my sugar is high, which one is better?"],["b","I hope you feel better soon 🙏 Doctor will go through everything with you in person. I can help with the timing. The earliest slot tomorrow is 10:20 AM. Shall I book it?",["Book 10:20 AM","See all slots"]],["p","[Photo: blood report]"],["b","Please bring your reports with you to the clinic. Doctor will review them during the consultation 😊"],["p","papa ko chest pain ho raha hai abhi"],["b","If this is an emergency, please call 108 or go to the nearest hospital right away.\nYou can also call the clinic directly: +91 11 4000 1234",["Call clinic"]]]},
+{n:"S6 Slot race + family",m:[["b","For tomorrow evening, closest to 6 PM:",["5:50 PM","6:10 PM","See all slots"]],["p","6:10 PM"],["sys","Another patient confirmed 6:10 PM a second earlier"],["b","Sorry Ramesh ji, 6:10 PM was taken just now. The nearest available times are:",["5:50 PM","6:30 PM","See all slots"]],["p","no, I need 6 pm only"],["b","I understand. Slots near 6 PM are full tomorrow. Would you like to try another day, or call the clinic? Staff will check if anything can be arranged.",["Try another day","Call clinic"]],["p","Call clinic"],["b","Please call Dr. Sharma's Clinic at +91 11 4000 1234 📞 (10 AM–1 PM, 5–8 PM)."],["sys","Later: same family, same slot"],["p","also book Aarav at 6:30 PM"],["b","6:30 PM is booked for you, Ramesh ji, and each slot takes one patient. Shall I book Aarav right after, at 6:50 PM?",["Book 6:50 PM","See all slots"]]]}
+];
+const tabs=document.getElementById('tabs'),chat=document.getElementById('chat');
+const esc=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+function show(i){[...tabs.children].forEach((b,j)=>b.classList.toggle('act',i===j));let h='',last='';
+S[i].m.forEach(([w,t,bt])=>{if(w==='sys'){h+=`<div class="sys">${esc(t)}</div>`;last='';return}
+const c=w==='p'?'me':w==='s'?'st':'bot';if(w==='s'&&last!=='s')h+=`<div class="who">Staff's WhatsApp</div>`;last=w;
+h+=`<div class="b ${c}">${esc(t)}${(bt||[]).map(x=>`<span class="btn">${esc(x)}</span>`).join('')}</div>`});chat.innerHTML=h}
+S.forEach((s,i)=>{const b=document.createElement('button');b.textContent=s.n;b.onclick=()=>show(i);tabs.appendChild(b)});show(0);
+</script>
+</body>
+</html>

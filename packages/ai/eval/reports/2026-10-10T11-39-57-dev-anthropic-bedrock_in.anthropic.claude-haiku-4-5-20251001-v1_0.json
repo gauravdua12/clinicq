@@ -1,0 +1,307 @@
+{
+  "promptVersion": "2026-10-10.1",
+  "summary": {
+    "model": "anthropic-bedrock:in.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "cases": 9,
+    "validPct": 0,
+    "allFieldsPct": 0,
+    "criticalPct": 0,
+    "intentPct": 0,
+    "medicalRecallPct": null,
+    "medicalFalsePosPct": 0,
+    "emergencyRecallPct": null,
+    "emergencyFalsePosPct": null,
+    "p50ms": 122,
+    "p95ms": 241,
+    "avgInTok": 0,
+    "avgOutTok": 0,
+    "usdPer1kMsgs": 0,
+    "inrPerMsg": 0,
+    "fieldAcc": {
+      "intent": 0,
+      "date": 0,
+      "time": 0,
+      "timeQualifier": 0,
+      "partOfDay": 0,
+      "forWhom": 0,
+      "profileRef": 0,
+      "relation": 0,
+      "newPersonName": 0,
+      "language": 0
+    },
+    "byCat": {
+      "book": 0
+    },
+    "errors": [
+      "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+    ],
+    "failures": [
+      {
+        "id": "b03",
+        "wrong": [
+          "intent",
+          "date",
+          "time"
+        ],
+        "got": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+      },
+      {
+        "id": "b01",
+        "wrong": [
+          "intent",
+          "date",
+          "partOfDay",
+          "forWhom",
+          "profileRef",
+          "medical"
+        ],
+        "got": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+      },
+      {
+        "id": "b02",
+        "wrong": [
+          "intent",
+          "date",
+          "time",
+          "timeQualifier",
+          "forWhom",
+          "profileRef",
+          "language"
+        ],
+        "got": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+      },
+      {
+        "id": "b05",
+        "wrong": [
+          "intent",
+          "date",
+          "time",
+          "forWhom",
+          "relation"
+        ],
+        "got": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+      },
+      {
+        "id": "b06",
+        "wrong": [
+          "intent",
+          "date",
+          "time",
+          "timeQualifier",
+          "forWhom",
+          "relation",
+          "newPersonName"
+        ],
+        "got": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+      },
+      {
+        "id": "b04",
+        "wrong": [
+          "intent",
+          "date",
+          "time",
+          "partOfDay"
+        ],
+        "got": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+      },
+      {
+        "id": "b07",
+        "wrong": [
+          "intent",
+          "date",
+          "time",
+          "timeQualifier"
+        ],
+        "got": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+      },
+      {
+        "id": "b08",
+        "wrong": [
+          "intent",
+          "date",
+          "language"
+        ],
+        "got": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+      },
+      {
+        "id": "b09",
+        "wrong": [
+          "intent",
+          "date",
+          "time"
+        ],
+        "got": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "b03",
+      "cat": "book",
+      "valid": false,
+      "latencyMs": 221.34608299998217,
+      "inTok": 0,
+      "outTok": 0,
+      "costUsd": 0,
+      "fields": {
+        "intent": false,
+        "date": false,
+        "time": false
+      },
+      "allOk": false,
+      "criticalOk": false,
+      "error": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+    },
+    {
+      "id": "b01",
+      "cat": "book",
+      "valid": false,
+      "latencyMs": 240.72591599999578,
+      "inTok": 0,
+      "outTok": 0,
+      "costUsd": 0,
+      "fields": {
+        "intent": false,
+        "date": false,
+        "partOfDay": false,
+        "forWhom": false,
+        "profileRef": false
+      },
+      "allOk": false,
+      "criticalOk": false,
+      "medExpected": false,
+      "error": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+    },
+    {
+      "id": "b02",
+      "cat": "book",
+      "valid": false,
+      "latencyMs": 228.1726670000062,
+      "inTok": 0,
+      "outTok": 0,
+      "costUsd": 0,
+      "fields": {
+        "intent": false,
+        "date": false,
+        "time": false,
+        "timeQualifier": false,
+        "forWhom": false,
+        "profileRef": false,
+        "language": false
+      },
+      "allOk": false,
+      "criticalOk": false,
+      "error": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+    },
+    {
+      "id": "b05",
+      "cat": "book",
+      "valid": false,
+      "latencyMs": 98.62804100001813,
+      "inTok": 0,
+      "outTok": 0,
+      "costUsd": 0,
+      "fields": {
+        "intent": false,
+        "date": false,
+        "time": false,
+        "forWhom": false,
+        "relation": false
+      },
+      "allOk": false,
+      "criticalOk": false,
+      "error": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+    },
+    {
+      "id": "b06",
+      "cat": "book",
+      "valid": false,
+      "latencyMs": 103.22862499998882,
+      "inTok": 0,
+      "outTok": 0,
+      "costUsd": 0,
+      "fields": {
+        "intent": false,
+        "date": false,
+        "time": false,
+        "timeQualifier": false,
+        "forWhom": false,
+        "relation": false,
+        "newPersonName": false
+      },
+      "allOk": false,
+      "criticalOk": false,
+      "error": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+    },
+    {
+      "id": "b04",
+      "cat": "book",
+      "valid": false,
+      "latencyMs": 163.77100000000792,
+      "inTok": 0,
+      "outTok": 0,
+      "costUsd": 0,
+      "fields": {
+        "intent": false,
+        "date": false,
+        "time": false,
+        "partOfDay": false
+      },
+      "allOk": false,
+      "criticalOk": false,
+      "error": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+    },
+    {
+      "id": "b07",
+      "cat": "book",
+      "valid": false,
+      "latencyMs": 105.64670899999328,
+      "inTok": 0,
+      "outTok": 0,
+      "costUsd": 0,
+      "fields": {
+        "intent": false,
+        "date": false,
+        "time": false,
+        "timeQualifier": false
+      },
+      "allOk": false,
+      "criticalOk": false,
+      "error": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+    },
+    {
+      "id": "b08",
+      "cat": "book",
+      "valid": false,
+      "latencyMs": 121.91645900000003,
+      "inTok": 0,
+      "outTok": 0,
+      "costUsd": 0,
+      "fields": {
+        "intent": false,
+        "date": false,
+        "language": false
+      },
+      "allOk": false,
+      "criticalOk": false,
+      "error": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+    },
+    {
+      "id": "b09",
+      "cat": "book",
+      "valid": false,
+      "latencyMs": 115.20170800000778,
+      "inTok": 0,
+      "outTok": 0,
+      "costUsd": 0,
+      "fields": {
+        "intent": false,
+        "date": false,
+        "time": false
+      },
+      "allOk": false,
+      "criticalOk": false,
+      "error": "Error: 403 Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cann"
+    }
+  ]
+}

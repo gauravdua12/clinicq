@@ -1,0 +1,45 @@
+{
+  "version": "7.1",
+  "data_api_version": "3.0",
+  "routing_model": { "PICK_DATE_SLOT": ["CONFIRM"], "CONFIRM": [] },
+  "screens": [
+    {
+      "id": "PICK_DATE_SLOT",
+      "title": "Choose date and time",
+      "data": {
+        "dates": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "enabled": { "type": "boolean" } } }, "__example__": [{ "id": "2026-10-10", "title": "Sat 10 Oct", "enabled": true }] },
+        "selected_date": { "type": "string", "__example__": "2026-10-10" },
+        "slots": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "description": { "type": "string" } } }, "__example__": [{ "id": "2026-10-10|1090", "title": "6:10 PM", "description": "Evening" }] },
+        "has_slots": { "type": "boolean", "__example__": true },
+        "error_message": { "type": "string", "__example__": "" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "Dropdown", "name": "date", "label": "Date", "required": true, "init-value": "${data.selected_date}", "data-source": "${data.dates}",
+            "on-select-action": { "name": "data_exchange", "payload": { "action": "date_selected", "date": "${form.date}" } } },
+          { "type": "RadioButtonsGroup", "name": "slot", "label": "Time", "required": true, "data-source": "${data.slots}", "visible": "${data.has_slots}" },
+          { "type": "TextCaption", "text": "${data.error_message}" },
+          { "type": "Footer", "label": "Continue", "on-click-action": { "name": "data_exchange", "payload": { "action": "slot_selected", "slot": "${form.slot}" } } }
+        ]
+      }
+    },
+    {
+      "id": "CONFIRM",
+      "title": "Confirm booking",
+      "terminal": true,
+      "data": {
+        "slot": { "type": "string", "__example__": "2026-10-10|1090" },
+        "held": { "type": "string", "__example__": "appt_123" },
+        "summary": { "type": "string", "__example__": "Sunita: Sat 10 Oct, 6:10 PM" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextBody", "text": "${data.summary}" },
+          { "type": "Footer", "label": "Confirm booking", "on-click-action": { "name": "complete", "payload": { "slot": "${data.slot}", "held": "${data.held}" } } }
+        ]
+      }
+    }
+  ]
+}

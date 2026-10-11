@@ -1,0 +1,70 @@
+{
+  "promptVersion": "2026-10-10.1",
+  "summary": {
+    "model": "bedrock:us.amazon.nova-lite-v1:0",
+    "cases": 1,
+    "validPct": 0,
+    "allFieldsPct": 0,
+    "criticalPct": 0,
+    "intentPct": 0,
+    "medicalRecallPct": null,
+    "medicalFalsePosPct": 0,
+    "emergencyRecallPct": null,
+    "emergencyFalsePosPct": null,
+    "p50ms": 36050,
+    "p95ms": 36050,
+    "avgInTok": 0,
+    "avgOutTok": 0,
+    "usdPer1kMsgs": 0,
+    "inrPerMsg": 0,
+    "fieldAcc": {
+      "intent": 0,
+      "date": 0,
+      "partOfDay": 0,
+      "forWhom": 0,
+      "profileRef": 0
+    },
+    "byCat": {
+      "book": 0
+    },
+    "errors": [
+      "ThrottlingException: Too many tokens per day, please wait before trying again."
+    ],
+    "failures": [
+      {
+        "id": "b01",
+        "wrong": [
+          "intent",
+          "date",
+          "partOfDay",
+          "forWhom",
+          "profileRef",
+          "medical"
+        ],
+        "got": "ThrottlingException: Too many tokens per day, please wait before trying again."
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "b01",
+      "cat": "book",
+      "valid": false,
+      "latencyMs": 36049.938125000044,
+      "inTok": 0,
+      "outTok": 0,
+      "costUsd": 0,
+      "fields": {
+        "intent": false,
+        "date": false,
+        "partOfDay": false,
+        "forWhom": false,
+        "profileRef": false
+      },
+      "allOk": false,
+      "criticalOk": false,
+      "medExpected": false,
+      "error": "ThrottlingException: Too many tokens per day, please wait before trying again."
+    }
+  ]
+}

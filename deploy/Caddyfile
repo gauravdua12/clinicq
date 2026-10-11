@@ -1,0 +1,28 @@
+# ClinicQ's own HTTPS front end for q.incolo.si (host binary /opt/clinicq/bin/caddy, service clinicq-caddy).
+# Separate from watsappai's Caddy (in Docker); only one of the two runs at a time (deploy/demo-switch.sh).
+{
+	admin 127.0.0.1:2119
+	storage file_system /opt/clinicq/caddy
+}
+
+q.incolo.si {
+	encode gzip
+	request_body {
+		max_size 2MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+	reverse_proxy 127.0.0.1:8090 {
+		flush_interval -1
+	}
+	log {
+		output file /opt/clinicq/caddy/access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

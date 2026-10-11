@@ -1,0 +1,21 @@
+{
+  "name": "@clinicq/ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^0.34.4",
+    "@anthropic-ai/sdk": "^0.133.0",
+    "@aws-crypto/sha256-js": "^4.0.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1149.0",
+    "@aws-sdk/client-transcribe-streaming": "^3.1149.0",
+    "@aws-sdk/credential-provider-node": "^3.972.85",
+    "@smithy/signature-v4": "^3.1.2",
+    "ogg-opus-decoder": "^1.7.5",
+    "zod": "^4.6.5"
+  }
+}

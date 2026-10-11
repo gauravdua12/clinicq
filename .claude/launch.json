@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "clinicq", "runtimeExecutable": "npx", "runtimeArgs": ["tsx", "apps/server/src/main.ts"], "port": 8080 }
+  ]
+}

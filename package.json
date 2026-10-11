@@ -1,0 +1,42 @@
+{
+  "name": "clinicq",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run db:generate && npm run build -w @clinicq/web && node scripts/build-server.mjs",
+    "start": "node apps/server/dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:boundary": "vitest run --project boundary",
+    "test:e2e": "vitest run --project e2e",
+    "db:generate": "npm run generate -w @clinicq/db",
+    "db:migrate": "npm run migrate -w @clinicq/db",
+    "db:deploy": "npm run deploy -w @clinicq/db",
+    "db:seed": "tsx packages/db/src/seed.ts",
+    "eval:extract": "tsx packages/ai/eval/run.ts",
+    "flow:keys": "tsx scripts/flow-keys.ts",
+    "meta": "tsx scripts/meta/meta.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^24.19.2",
+    "esbuild": "^0.28.0",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.3"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.10.0": true,
+    "esbuild@0.28.2": true,
+    "prisma@7.10.0": true
+  }
+}
