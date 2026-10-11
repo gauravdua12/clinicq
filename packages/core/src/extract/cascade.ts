@@ -65,7 +65,8 @@ export function postValidate(e: Extraction, ctx: ExtractContext): Extraction {
   out.selfName = sanitizeName(out.selfName);
   if (!out.time) out.timeQualifier = null;
   // A status/info question that names a day or time is a request for a slot ("any slot today evening?").
-  if ((out.intent === "STATUS" || out.intent === "CLINIC_INFO") && (out.time || (out.date && out.date !== ctx.today) || (out.date && out.partOfDay)) && ctx.state === "IDLE") out.intent = "BOOK";
+  // ...but "is the clinic open on Sunday?" (a day, no specific time) is a question about timings, and gets the timings.
+  if ((out.intent === "STATUS" || (out.intent === "CLINIC_INFO" && (out.clinicInfoTopic !== "timings" || out.time))) && (out.time || (out.date && out.date !== ctx.today) || (out.date && out.partOfDay)) && ctx.state === "IDLE") out.intent = "BOOK";
   if (out.intent !== "CLINIC_INFO") out.clinicInfoTopic = null;
   return out;
 }
@@ -136,8 +137,11 @@ function fixLanguage(o: ExtractOutcome, text: string): ExtractOutcome {
 const TIME_EVIDENCE = /\d|[०-९]|\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|noon|ek|do|teen|char|chaar|paanch|panch|che|chhe|saat|aath|nau|das|gyarah|barah|saade|sadhe|dedh|dhai|first|second|third|pehla|pehli|doosra|dusra|last|aakhri)\b|बजे|साढ़े|डेढ़|ढाई|दोपहर 12/i;
 /** "10 se 11 ke beech", "between 10 and 11", "10-11", "10 से 11" → a range, so offer choices (never auto-book). */
 const TIME_RANGE = /\b(between|beech|bich)\b|के बीच|बीच में|\b\d{1,2}\s*(se|to|-|–|से)\s*\d{1,2}\b(?![:./]\d)|\b\d{1,2}\s*(se|से)\s*\d{1,2}\s*(tak|तक|ke|के)/i;
+/** Numbers that are durations, counts or money ("3 din se", "2 weeks", "₹500", "5 saal") are not evidence of a time. */
+const NOT_A_TIME = /(₹|rs\.?\s*)\d+|\d+\s*(din|dino|dinon|days?|hafte|hafta|haftay|weeks?|mahine|mahina|months?|saal|sal|years?|yrs?|ghante|ghanta|hours?|hrs?|minutes?|mins?|baar|times|log|people|rupaye|rupees|rs|kg|tablets?|goli)\b|[0-9०-९]+\s*(दिन|हफ्ते|हफ़्ते|महीने|साल|घंटे|बार|रुपये)/gi;
+
 function guardInventedTime(o: ExtractOutcome, text: string): ExtractOutcome {
-  if (o.extraction.time && !TIME_EVIDENCE.test(text)) { o.extraction.time = null; o.extraction.timeQualifier = null; }
+  if (o.extraction.time && !TIME_EVIDENCE.test(text.replace(NOT_A_TIME, " "))) { o.extraction.time = null; o.extraction.timeQualifier = null; }
   if (o.extraction.time && TIME_RANGE.test(text) && o.extraction.timeQualifier !== "after" && o.extraction.timeQualifier !== "before") o.extraction.timeQualifier = "around";
   return o;
 }

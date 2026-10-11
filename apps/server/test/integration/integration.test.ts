@@ -100,7 +100,20 @@ describe("WhatsApp Flow data endpoint", () => {
     const init = await call({ action: "INIT", flow_token: token, version: "3.0" });
     expect(init.data?.screen).toBe("PICK_DATE_SLOT");
     expect((init.data?.data.dates as { id: string; enabled: boolean }[]).find((d) => d.id === "2026-10-11")?.enabled).toBe(false); // Sunday closed
-    const pick = await call({ action: "data_exchange", flow_token: token, data: { action: "slot_selected", slot: "2026-10-10|1090" } });
+    // Morning and Evening chips for the selected day; booked slots are greyed out (enabled: false)
+    await holdSlot(h.ctx, (await windowAvailability(h.ctx, await clinicInfo(h.ctx))) && { date: "2026-10-10", sessionId: (await clinicInfo(h.ctx)).sessions.find((x) => x.label === "Evening" && x.weekday === 6)!.id, sessionLabel: "Evening", startMin: 1110, endMin: 1130, index: 5 }, prof.id, acc.id).catch(() => undefined);
+    const day = await call({ action: "data_exchange", flow_token: token, data: { action: "date_selected", date: ["2026-10-10"] } });
+    const d = day.data!.data as { selected_date: string[]; morning: { id: string; title: string; enabled: boolean }[]; evening: { id: string; title: string; enabled: boolean }[]; has_morning: boolean; has_evening: boolean; evening_label: string };
+    expect(d.selected_date).toEqual(["2026-10-10"]);
+    expect(d.has_morning && d.has_evening).toBe(true);
+    expect(d.morning.length).toBe(9); // 10:00 … 12:40, all shown
+    expect(d.evening.find((c) => c.id === "2026-10-10|1110")?.enabled).toBe(false); // held → greyed
+    expect(d.evening.find((c) => c.id === "2026-10-10|1090")).toMatchObject({ title: "6:10", enabled: true });
+    expect(d.evening_label).toMatch(/^Evening · 5:10 PM – 7:50 PM$/);
+    await h.db.appointment.deleteMany({});
+    const two = await call({ action: "data_exchange", flow_token: token, data: { action: "slot_selected", date: ["2026-10-10"], morning: ["2026-10-10|600"], evening: ["2026-10-10|1090"] } });
+    expect((two.data!.data as { error_message: string }).error_message).toMatch(/just one/);
+    const pick = await call({ action: "data_exchange", flow_token: token, data: { action: "slot_selected", date: ["2026-10-10"], morning: [], evening: ["2026-10-10|1090"] } });
     expect(pick.data?.screen).toBe("CONFIRM");
     expect(await h.db.appointment.count({ where: { status: "HELD" } })).toBe(1);
     const other = generateKeyPairSync("rsa", { modulusLength: 2048, publicKeyEncoding: { type: "spki", format: "pem" }, privateKeyEncoding: { type: "pkcs8", format: "pem" } });
@@ -258,5 +271,83 @@ describe("demo presenter: doctor and patient on one phone", () => {
     } finally {
       if (prev === undefined) delete process.env.DEMO_PRESENTER_PHONES; else process.env.DEMO_PRESENTER_PHONES = prev;
     }
+  });
+});
+
+describe("phone-test feedback (11 Oct 2026)", () => {
+  it("#1 list fallback: a day with more than 10 free slots asks Morning/Evening first, then lists that session in full", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    await onboard(h);
+    await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
+    await h.say(PATIENT, "book monday for me"); // a full day: 9 morning + 9 evening free slots
+    await h.tap(PATIENT, "see_all");
+    const ask = h.wa.last(PATIENT);
+    expect(ask?.kind).toBe("buttons");
+    const evening = ask?.kind === "buttons" ? ask.buttons.find((b) => b.title.startsWith("Evening"))! : null;
+    expect(evening?.title).toMatch(/^Evening \(\d+\)$/);
+    await h.tap(PATIENT, evening!.id);
+    const list = h.wa.last(PATIENT);
+    expect(list?.kind).toBe("list");
+    const rows = list?.kind === "list" ? list.sections.flatMap((s) => s.rows) : [];
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows.every((r) => / PM$/.test(r.title))).toBe(true);
+  });
+
+  it("#2 booking form opens as soon as the patient wants to book (draft mode until Meta publishes it)", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048, publicKeyEncoding: { type: "spki", format: "pem" }, privateKeyEncoding: { type: "pkcs8", format: "pem" } });
+    h.ctx.flowKey = createPrivateKeyForTest(privateKey);
+    Object.assign(h.ctx.env, { WA_FLOW_ID_BOOKING: "1459463439439703", WA_FLOW_MODE: "draft" });
+    await onboard(h);
+    await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
+    await h.say(PATIENT, "I want to book an appointment for me");
+    const f = h.wa.last(PATIENT);
+    expect(f?.kind).toBe("flow");
+    expect(f?.kind === "flow" && f.draft).toBe(true);
+    const { toCloudPayload } = await import("@clinicq/wa");
+    expect(JSON.stringify(toCloudPayload(PATIENT, f!))).toContain('"mode":"draft"');
+    Object.assign(h.ctx.env, { WA_FLOW_ID_BOOKING: undefined, WA_FLOW_MODE: "published" });
+  });
+
+  it("#3 'sure' after a completed cancellation gets a polite close, not the menu", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    await onboard(h);
+    await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
+    await h.say(PATIENT, "book tomorrow 6:10 pm for me");
+    await h.tap(PATIENT, "vt:NEW");
+    await h.say(PATIENT, "cancel my appointment");
+    if ((await h.kinds(PATIENT)).at(-1) !== "CX_DONE") await h.tap(PATIENT, `cx:yes:${(await h.db.appointment.findFirstOrThrow()).id}`);
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("CX_DONE");
+    await h.say(PATIENT, "Sure");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("ACK_CLOSING");
+    await h.say(PATIENT, "ok"); // a second acknowledgement still closes politely
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("ACK_CLOSING");
+  });
+
+  it("#4 queue status without a booking today says it's only for bookings (and shows the next one if any)", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    await onboard(h);
+    await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
+    await h.tap(PATIENT, "menu:status");
+    const none = h.wa.last(PATIENT);
+    expect(none?.kind === "buttons" && none.body).toMatch(/^Queue status is visible for your bookings only\./);
+    await h.say(PATIENT, "book tomorrow 6:10 pm for me");
+    await h.tap(PATIENT, "vt:NEW");
+    await h.tap(PATIENT, "menu:status");
+    const fut = h.wa.last(PATIENT);
+    expect(fut?.kind === "text" && fut.body).toMatch(/visible for your bookings only.*Sat 10 Oct, 6:10 PM/s);
+  });
+
+  it("#5 visit type is explained, labelled 'Report review', and shown in the confirmation", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    await onboard(h);
+    await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
+    await h.say(PATIENT, "book tomorrow 6:10 pm for me");
+    const q = h.wa.last(PATIENT);
+    expect(q?.kind === "buttons" && q.body).toMatch(/test reports reviewed by the doctor/);
+    expect(q?.kind === "buttons" && q.buttons.map((b) => b.title)).toEqual(["New consultation", "Follow-up", "Report review"]);
+    await h.tap(PATIENT, "vt:REPORT_SHOW");
+    const c = h.wa.last(PATIENT);
+    expect(c?.kind === "buttons" && c.body).toMatch(/6:10 PM · Report review/);
   });
 });

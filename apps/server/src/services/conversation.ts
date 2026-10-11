@@ -50,8 +50,14 @@ interface Conv {
   cxApptId?: string;
   welcomeSent?: boolean;
   emergencyAt?: number;
+  lastOut?: string; // kind of the bot's last message (context for short replies like "sure", "ok")
   seed: number;
 }
+
+/** After these the conversation is complete; a bare "ok / sure / thanks" deserves a polite close, not a menu. */
+const CLOSING = new Set(["BOOKING_CONFIRMED", "CX_DONE", "CX_KEPT", "RS_DONE", "REMINDER_CONFIRMED", "STATUS", "STATUS_BOOKED", "STATUS_NEXT", "STATUS_FUTURE",
+  "THANKS_REPLY", "ACK_CLOSING", "MY_DATA", "MY_APPOINTMENTS", "CLINIC_ADDRESS", "CLINIC_FEES", "CLINIC_TIMINGS", "ALT_NUMBER_SAVED", "ARRIVED_OK", "ALREADY_IN_QUEUE",
+  "LANGUAGE_SET", "OPTED_IN", "OPTED_OUT", "CALL_CLINIC", "YOUR_TURN"]);
 
 const QUESTION: Partial<Record<State, string>> = {
   AWAIT_CONSENT: "agree to the privacy notice?", AWAIT_NUMBER_CONFIRM: "use this number for booking?", AWAIT_ALT_NUMBER: "10-digit mobile number",
@@ -76,6 +82,7 @@ class Turn {
     return this.lang === "hi" ? `, ${name} जी` : `, ${name} ji`;
   }
   async send(msg: OutMsg, kind: string): Promise<void> {
+    this.conv.lastOut = kind;
     await sendTo(this.ctx, this.waId, msg, { kind, accountId: this.acc.id });
   }
   async text(id: C.CopyId, vars: C.Vars = {}): Promise<void> { await this.send({ kind: "text", body: this.t(id, vars) }, id); }
@@ -272,7 +279,7 @@ async function onState(t: Turn, e: Extraction): Promise<void> {
   // IDLE
   if (e.intent === "BOOK" || (e.intent === "PROVIDE" && (e.date || e.time != null || e.partOfDay))) return startBooking(t, e);
   if (e.intent === "GREETING") return menu(t, "MAIN_MENU");
-  if (e.intent === "AFFIRM" || e.intent === "DENY") return menu(t, "OTHER_HELP");
+  if (e.intent === "AFFIRM" || e.intent === "DENY") return t.conv.lastOut && CLOSING.has(t.conv.lastOut) ? t.text("ACK_CLOSING") : menu(t, "OTHER_HELP");
   if (e.hasNonBookingContent) return;
   return menu(t, "OTHER_HELP");
 }
@@ -372,6 +379,7 @@ async function onButton(t: Turn, id: string): Promise<void> {
       return choose(t, { date, startMin: Number(min) });
     }
     case "see_all": return slotPicker(t, t.conv.requested?.date ?? nowLocal(t.ctx).date);
+    case "sess": { const [date, label] = (a ?? "").split("|"); return slotPicker(t, date ?? nowLocal(t.ctx).date, false, label); }
     case "vt": t.conv.p.visitType = a as VisitType; return finalize(t);
     case "who":
       if (a === "me") { t.conv.p.forWhom = "self"; t.conv.p.whoAsked = true; t.conv.p.profileId = undefined; return progressBooking(t); }
@@ -510,6 +518,7 @@ async function progressBooking(t: Turn): Promise<void> {
   }
   if (t.conv.state === "BK_NAME" || t.conv.state === "BK_WHO") await t.text("ACK_PROFILE", { name: currentName(t) });
   if (p.date || p.time != null || p.pod) return offer(t);
+  if (p.intent === "BOOK" && flowReady(t)) return openFlow(t);
   return askWhen(t);
 }
 
@@ -632,32 +641,47 @@ async function offer(t: Turn): Promise<void> {
   return slotPicker(t, r.hasAny ? date : (S.firstDateWithFree(date, avail) ?? date), true);
 }
 
-/** Form D (WhatsApp Flow) when configured, else the list picker (form C). */
-async function slotPicker(t: Turn, fromDate: string, introSent = false): Promise<void> {
-  const flowId = t.ctx.env.WA_FLOW_ID_BOOKING;
+function flowReady(t: Turn): boolean {
+  return !!(t.info.settings.flowsEnabled && t.ctx.env.WA_FLOW_ID_BOOKING && t.ctx.flowKey);
+}
+
+/** Form D: the WhatsApp booking form (date chips, Morning / Evening slot chips). */
+async function openFlow(t: Turn): Promise<void> {
   const name = currentName(t) ?? "";
-  if (t.info.settings.flowsEnabled && flowId && t.ctx.flowKey) {
-    const token = randomBytes(24).toString("base64url");
-    await t.ctx.db.flowToken.create({ data: { token, accountId: t.acc.id, profileId: t.conv.p.profileId ?? null, expiresAt: new Date(t.ctx.clock.now().getTime() + 15 * 60_000) } });
-    t.set("BK_FLOW_OPEN");
-    return t.send({ kind: "flow", body: t.t("FLOW_BODY", { name }), cta: t.b("CHOOSE_DATE_TIME"), flowId, flowToken: token, screen: "PICK_DATE_SLOT" }, "FLOW_BOOKING");
-  }
+  const token = randomBytes(24).toString("base64url");
+  await t.ctx.db.flowToken.create({ data: { token, accountId: t.acc.id, profileId: t.conv.p.profileId ?? null, expiresAt: new Date(t.ctx.clock.now().getTime() + 15 * 60_000) } });
+  t.set("BK_FLOW_OPEN");
+  return t.send({ kind: "flow", body: t.t("FLOW_BODY", { name }), cta: t.b("CHOOSE_DATE_TIME"), flowId: t.ctx.env.WA_FLOW_ID_BOOKING!, flowToken: token, screen: "PICK_DATE_SLOT", draft: t.ctx.env.WA_FLOW_MODE === "draft" }, "FLOW_BOOKING");
+}
+
+/** Form D when available, else the list picker (form C): one day, split by session when it wouldn't fit in 10 rows. */
+async function slotPicker(t: Turn, fromDate: string, introSent = false, session?: string): Promise<void> {
   void introSent;
+  if (flowReady(t) && t.conv.p.intent !== "RESCHEDULE") return openFlow(t);
+  const name = currentName(t) ?? "";
   const avail = await windowAvailability(t.ctx, t.info);
+  let day: string | null = null;
+  for (let i = 0; i <= t.info.settings.windowDays && !day; i++) { const d = T.addDays(fromDate, i); if (S.freeSlotsOn(d, avail).length) day = d; }
+  if (!day) return callClinic(t);
+  const bySession = new Map<string, S.Slot[]>();
+  for (const s of S.freeSlotsOn(day, avail)) bySession.set(s.sessionLabel, [...(bySession.get(s.sessionLabel) ?? []), s]);
+  const total = [...bySession.values()].reduce((n, ss) => n + ss.length, 0);
+  t.conv.requested = { ...t.conv.requested, date: day };
+  if (!session && total > 10 && bySession.size > 1) {
+    t.set("BK_PICK_SLOT");
+    t.conv.offered = [];
+    const dayLabel = T.fmtDayLabel(day, nowLocal(t.ctx).date, t.lang);
+    return t.buttons(t.t("LIST_PICK_SESSION", { dayLabel }), "LIST_PICK_SESSION",
+      [...bySession.entries()].slice(0, 3).map(([label, ss]) => ({ id: `sess:${day}|${label}`, title: `${label} (${ss.length})`.slice(0, 20) })));
+  }
   const sections: ListSection[] = [];
   const offered: SlotRef[] = [];
-  for (let i = 0; i <= t.info.settings.windowDays && offered.length < 10; i++) {
-    const d = T.addDays(fromDate, i);
-    const free = S.freeSlotsOn(d, avail);
-    const bySession = new Map<string, S.Slot[]>();
-    for (const s of free) bySession.set(s.sessionLabel, [...(bySession.get(s.sessionLabel) ?? []), s]);
-    for (const [label, ss] of bySession) {
-      const take = ss.slice(0, 10 - offered.length);
-      if (!take.length) break;
-      sections.push({ title: `${label} · ${T.fmtDayShort(d, "en")}`.slice(0, 24), rows: take.map((s) => ({ id: `slot:${s.date}|${s.startMin}`, title: T.fmtTime(s.startMin) })) });
-      offered.push(...take.map((s) => ({ date: s.date, startMin: s.startMin })));
-      if (offered.length >= 10) break;
-    }
+  for (const [label, ss] of bySession) {
+    if (session && label !== session) continue;
+    const take = ss.slice(0, 10 - offered.length);
+    if (!take.length) break;
+    sections.push({ title: `${label} · ${T.fmtDayShort(day, "en")}`.slice(0, 24), rows: take.map((s) => ({ id: `slot:${s.date}|${s.startMin}`, title: T.fmtTime(s.startMin) })) });
+    offered.push(...take.map((s) => ({ date: s.date, startMin: s.startMin })));
   }
   if (!offered.length) return callClinic(t);
   t.conv.offered = offered;
@@ -764,7 +788,8 @@ async function finalize(t: Turn): Promise<void> {
     } else {
       appt = await confirmHold(t.ctx, t.conv.held, p.visitType ?? "NEW");
       const date = T.localDate(appt.slotStart, t.ctx.tz);
-      await t.buttons(t.t("BOOKING_CONFIRMED", { name: currentName(t), dayShort: T.fmtDayShort(date, t.lang), time: T.fmtTime(T.localMinutes(appt.slotStart, t.ctx.tz)), token: appt.token }), "BOOKING_CONFIRMED",
+      const visit = t.b(appt.visitType === "FOLLOW_UP" ? "FOLLOW_UP" : appt.visitType === "REPORT_SHOW" ? "REPORT_SHOW" : "NEW");
+      await t.buttons(t.t("BOOKING_CONFIRMED", { name: currentName(t), dayShort: T.fmtDayShort(date, t.lang), time: T.fmtTime(T.localMinutes(appt.slotStart, t.ctx.tz)), token: appt.token, visit }), "BOOKING_CONFIRMED",
         [{ id: `appt:rs:${appt.id}`, title: t.b("RESCHEDULE") }, { id: `appt:cx:${appt.id}`, title: t.b("CANCEL") }]);
     }
     t.conv.p = { profileId: p.profileId };
@@ -885,6 +910,8 @@ async function status(t: Turn): Promise<void> {
     const late = doc.delayDate && T.dateFromDb(doc.delayDate) === n.date && doc.delayMinutes > 0 ? doc.delayMinutes : 0;
     return t.text("STATUS_BOOKED", { time: T.fmtTime(T.localMinutes(booked.slotStart, t.ctx.tz)), token: booked.token, runningStatus: late ? C.render("RUNNING_LATE", t.lang, { min: late }) : C.render("RUNNING_ON_TIME", t.lang) });
   }
+  const next = (await upcomingForAccount(t.ctx, t.acc.id)).find((u) => u.status === "BOOKED");
+  if (next) return t.text("STATUS_FUTURE", { name: firstName(next.profileName), dayShort: T.fmtDayShort(T.localDate(next.slotStart, t.ctx.tz), t.lang), time: T.fmtTime(T.localMinutes(next.slotStart, t.ctx.tz)), token: next.token ?? "" });
   return t.buttons(t.t("STATUS_NONE"), "STATUS_NONE", [{ id: "menu:book", title: t.b("BOOK") }]);
 }
 

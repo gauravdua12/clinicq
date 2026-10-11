@@ -9,7 +9,7 @@ export type OutMsg =
   | { kind: "text"; body: string; previewUrl?: boolean }
   | { kind: "buttons"; body: string; buttons: Button[]; footer?: string }
   | { kind: "list"; body: string; button: string; sections: ListSection[] }
-  | { kind: "flow"; body: string; cta: string; flowId: string; flowToken: string; screen: string; data?: Record<string, unknown> }
+  | { kind: "flow"; body: string; cta: string; flowId: string; flowToken: string; screen: string; data?: Record<string, unknown>; draft?: boolean }
   | { kind: "contact"; name: string; phone: string }
   | { kind: "template"; name: string; lang: string; bodyParams: string[]; quickReplyPayloads?: string[]; otpCode?: string };
 
@@ -81,6 +81,7 @@ export function toCloudPayload(to: string, m: OutMsg): Record<string, unknown> {
             name: "flow",
             parameters: {
               flow_message_version: "3", flow_id: m.flowId, flow_token: m.flowToken, flow_cta: m.cta, flow_action: "data_exchange",
+              ...(m.draft ? { mode: "draft" } : {}), // unpublished form (before business verification): testers only
             },
           },
         },

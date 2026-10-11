@@ -67,3 +67,10 @@ WhatsApp voice notes (OGG/Opus) are decoded to 16 kHz WAV **in memory** (WebAsse
 
 ## Not tested (account limits)
 gpt-oss-20b/120b and Claude Haiku 4.5 on classic Bedrock are blocked by Free-plan quotas and the Marketplace payment requirement (see `docs/runbooks/aws-bedrock-access.md`). Adapters for both are built; after the account upgrade, re-run the bake-off with `--models bedrock:openai.gpt-oss-120b-1:0,anthropic-bedrock:in.anthropic.claude-haiku-4-5-20251001-v1:0`.
+
+### Change log
+- **11 Oct 2026:** two deterministic guards were refined after real-phone testing.
+  - Numbers that are durations, counts or amounts ("3 din se", "2 weeks", "₹500", "5 saal") no longer count as evidence of a time.
+  - A timings question that names a day but no time ("open on Sunday?") stays a clinic-info question.
+  - Held-out case **x69** ("doc available on mon? @ 7") was looked at while scoping the second rule, so it is now contaminated, like x57.
+  - Final cascade run: **94.8% all-fields** (baseline 94.3%), with health and emergency recall at 100%. Unchanged cases vary by about ±2 points between runs: b04, h09, x17, x32 and x67 flipped in an intermediate run with no related change.
