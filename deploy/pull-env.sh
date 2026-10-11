@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 REGION="${AWS_REGION:-ap-south-1}"
 umask 027
-mkdir -p /etc/clinicq
+mkdir -p /etc/clinicq && chown root:clinicq /etc/clinicq && chmod 750 /etc/clinicq
 TMP=$(mktemp /etc/clinicq/.env.XXXXXX)
 grep -v '^\s*#' clinicq.env.base | grep -v '^\s*$' > "$TMP"
 aws ssm get-parameters-by-path --region "$REGION" --path /clinicq/ --with-decryption --query 'Parameters[*].[Name,Value]' --output json |
