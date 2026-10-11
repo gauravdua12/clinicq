@@ -132,6 +132,16 @@ describe("privacy", () => {
     expect(await h.db.dataRequest.count({ where: { type: "ERASURE" } })).toBe(1);
   });
 
+  it("erasure leaves nothing behind even if WhatsApp can't deliver the confirmation", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    await onboard(h);
+    await h.say(PATIENT, "delete my data");
+    h.wa.failNext = 10; // Meta outage / closed 24 h window while erasing
+    await h.tap(PATIENT, "erase:yes");
+    expect(await h.db.patientAccount.count()).toBe(0);
+    expect(await h.db.conversationState.count()).toBe(0);
+  });
+
   it("purge anonymises old visits and deletes inactive accounts", async () => {
     h = await harness({ start: "2026-10-09T12:00:00+05:30" });
     await onboard(h);

@@ -121,6 +121,7 @@ export async function handleInbound(ctx: Ctx, msg: InboundMessage): Promise<void
     ctx.log.error({ err: e }, "conversation_error");
     await t.text("SYSTEM_ERROR").catch(() => undefined);
   }
+  if (!(await ctx.db.patientAccount.findUnique({ where: { id: acc.id }, select: { id: true } }))) return; // erased meanwhile
   await saveConv(ctx, acc.id, t.conv);
   if (t.conv.lang !== acc.language) await ctx.db.patientAccount.update({ where: { id: acc.id }, data: { language: t.conv.lang } });
 }
@@ -1049,7 +1050,8 @@ async function erase(t: Turn): Promise<void> {
   const lang = t.lang;
   const body = C.render("ERASE_DONE", lang, t.baseVars());
   await ctx.db.patientAccount.delete({ where: { id: t.acc.id } });
-  await ctx.wa.send(t.waId, { kind: "text", body });
+  // The erasure is complete; a failed confirmation (Meta outage, closed 24 h window) must not resurrect any state.
+  await ctx.wa.send(t.waId, { kind: "text", body }).catch((e) => ctx.log.error({ err: e }, "erase_confirmation_not_sent"));
   // the account row is gone; saveConv would recreate it — mark so handleInbound skips persistence
   t.conv = { ...t.conv, state: "IDLE", p: {} };
   (t as unknown as { erased: boolean }).erased = true;
