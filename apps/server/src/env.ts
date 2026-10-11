@@ -42,6 +42,7 @@ export const EnvSchema = z.object({
   DEMO_STUDIO: bool.default(false),
   WA_DISPLAY_NUMBER: z.string().default(""), // the WhatsApp number patients message, e.g. 919920323832
   DEMO_PRESENTER_PHONES: z.string().default(""),
+  INCOLO_ADMIN_PHONES: z.string().default(""), // Incolo's internal admins: language model settings, Demo Studio (never clinic staff)
   JOB_POLL_MS: z.coerce.number().default(15000),
   HOST: z.string().default("0.0.0.0"), // 127.0.0.1 behind a local reverse proxy
   STALE_INBOUND_MIN: z.coerce.number().default(30), // older messages (Meta re-deliveries after downtime) are not acted on

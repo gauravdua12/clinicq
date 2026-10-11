@@ -23,6 +23,8 @@ export const ClinicSettings = z.object({
   display: z.object({ showFirstName: z.boolean().default(true), voiceCallout: z.boolean().default(true), showQr: z.boolean().default(true) })
     .default({ showFirstName: true, voiceCallout: true, showQr: true }),
   flowsEnabled: z.boolean().default(true),
+  /** How patients pick a time: the booking page (form D) or in the chat (nearest-time buttons, Morning/Evening lists). */
+  slotPicker: z.enum(["page", "chat"]).default("page"),
   fees: z.string().default(""),
   payments: z.object({ enabled: z.boolean().default(false), amountPaise: z.number().default(0) }).default({ enabled: false, amountPaise: 0 }),
   retention: z.object({

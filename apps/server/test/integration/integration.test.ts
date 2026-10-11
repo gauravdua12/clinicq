@@ -438,3 +438,46 @@ describe("sessions with a set number of slots", () => {
     expect(mon.filter((s) => s.sessionLabel === "Morning").at(-1)!.startMin).toBe(10 * 60 + 49 * 3); // 12:27, not 12:57
   });
 });
+
+describe("internal (Incolo) admin only", () => {
+  it("a clinic's doctor can't see or change the language model or open Demo Studio in production", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    const login = await h.app.inject({ method: "POST", url: "/api/auth/dev-login", payload: { role: "DOCTOR" } });
+    const sid = login.cookies.find((c) => c.name === "sid")!.value;
+    const prev = { DEV_TOOLS: h.ctx.env.DEV_TOOLS, INCOLO_ADMIN_PHONES: h.ctx.env.INCOLO_ADMIN_PHONES, DEMO_STUDIO: h.ctx.env.DEMO_STUDIO };
+    Object.assign(h.ctx.env, { DEV_TOOLS: false, INCOLO_ADMIN_PHONES: "", DEMO_STUDIO: true }); // production rules
+    try {
+      expect((await h.app.inject({ url: "/api/me", cookies: { sid } })).json()).toMatchObject({ role: "DOCTOR", incoloAdmin: false });
+      expect((await h.app.inject({ url: "/api/settings/ai", cookies: { sid } })).statusCode).toBe(403);
+      expect((await h.app.inject({ method: "PUT", url: "/api/settings/ai", cookies: { sid }, payload: { primary: "rules" } })).statusCode).toBe(403);
+      expect((await h.app.inject({ url: "/api/demo", cookies: { sid } })).statusCode).toBe(403);
+      expect((await h.app.inject({ url: "/api/settings/sessions", cookies: { sid } })).statusCode).toBe(200); // clinic settings stay theirs
+      h.ctx.env.INCOLO_ADMIN_PHONES = "9999900001"; // this person is Incolo's internal admin
+      expect((await h.app.inject({ url: "/api/me", cookies: { sid } })).json()).toMatchObject({ incoloAdmin: true });
+      expect((await h.app.inject({ url: "/api/settings/ai", cookies: { sid } })).statusCode).toBe(200);
+    } finally {
+      Object.assign(h.ctx.env, prev);
+    }
+  });
+});
+
+describe("slot picker setting (console switch)", () => {
+  it("'page' sends the booking-page button; 'chat' keeps the in-chat buttons and lists", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    const login = await h.app.inject({ method: "POST", url: "/api/auth/dev-login", payload: { role: "DOCTOR" } });
+    const sid = login.cookies.find((c) => c.name === "sid")!.value;
+    const cur = (await h.app.inject({ url: "/api/settings/clinic", cookies: { sid } })).json();
+    expect(cur.settings.slotPicker).toBe("page"); // default
+    await onboard(h);
+    await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
+    await h.say(PATIENT, "book appointment for me");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("BOOK_LINK");
+    const put = await h.app.inject({ method: "PUT", url: "/api/settings/clinic", cookies: { sid }, payload: { ...cur, settings: { ...cur.settings, slotPicker: "chat" } } });
+    expect(put.statusCode).toBe(200);
+    const { invalidateClinicCache } = await import("../../src/services/clinic");
+    invalidateClinicCache();
+    await h.say(PATIENT, "book appointment for me on monday");
+    await h.tap(PATIENT, "see_all");
+    expect(["LIST_PICK_SESSION", "LIST_PICKER"]).toContain((await h.kinds(PATIENT)).at(-1)); // in-chat format
+  });
+});

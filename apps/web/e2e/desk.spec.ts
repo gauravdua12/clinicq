@@ -81,7 +81,7 @@ test("appointments: book on behalf, validation, cancel", async ({ page }) => {
   await loginAs(page);
   await page.getByRole("link", { name: "Appointments" }).first().click();
   await page.getByRole("button", { name: /Mon,? 12 Oct/ }).click();
-  await page.getByRole("row").filter({ hasText: "10:20 AM" }).getByRole("button", { name: "Book" }).click();
+  await page.getByRole("row").filter({ hasText: "10:15 AM" }).getByRole("button", { name: "Book" }).click(); // 15-minute default: second morning slot
   await page.getByRole("button", { name: "Book", exact: true }).last().click();
   await expect(page.getByText("Enter the patient's name.")).toBeVisible();
   await page.getByLabel("Patient name").fill("Kiran Rao");

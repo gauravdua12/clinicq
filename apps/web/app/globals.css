@@ -276,3 +276,8 @@ button.bk-date:focus-visible, button.bk-slot:focus-visible, button.bk-visit:focu
 .sess-table input[type="time"] { min-width: 118px; }
 .sess-table input[type="number"] { width: 76px; }
 .nowrap { white-space: nowrap; }
+
+.picker-choice { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px 12px; margin: 14px 0 0; }
+.picker-choice legend { font: 700 14px var(--font-display); padding: 0 6px; }
+.picker-choice label { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0 0; font-weight: 400; cursor: pointer; }
+.picker-choice input[type="radio"] { width: auto; min-height: 0; margin-top: 4px; }

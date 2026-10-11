@@ -10,7 +10,9 @@ export const SEED = {
   clinicCode: "DRS",
 };
 
-export async function seed(db: Db, opts: { displayKey?: string } = {}): Promise<{ clinicId: string; doctorId: string }> {
+/** Default slot length is 15 minutes (doctors change it in Settings → Sessions). Test fixtures pin 20 to keep their timings. */
+export async function seed(db: Db, opts: { displayKey?: string; slotMinutes?: number } = {}): Promise<{ clinicId: string; doctorId: string }> {
+  const slotMinutes = opts.slotMinutes ?? 15;
   const clinic = await db.clinic.create({
     data: {
       name: "Dr. Sharma's Clinic", addressShort: "Sector 15, Gurugram", addressFull: "SCO 21, Sector 15 Market, Gurugram, Haryana 122001",
@@ -22,8 +24,8 @@ export async function seed(db: Db, opts: { displayKey?: string } = {}): Promise<
   });
   const doctor = await db.doctor.create({ data: { clinicId: clinic.id, displayName: "Dr. Sharma", qualification: "MBBS, MD (Medicine)" } });
   for (let wd = 1; wd <= 6; wd++) {
-    await db.session.create({ data: { doctorId: doctor.id, weekday: wd, label: "Morning", startTime: "10:00", endTime: "13:00", slotMinutes: 20, walkinQuota: 10 } });
-    await db.session.create({ data: { doctorId: doctor.id, weekday: wd, label: "Evening", startTime: "17:10", endTime: "20:00", slotMinutes: 20, walkinQuota: 10 } });
+    await db.session.create({ data: { doctorId: doctor.id, weekday: wd, label: "Morning", startTime: "10:00", endTime: "13:00", slotMinutes, walkinQuota: 10 } });
+    await db.session.create({ data: { doctorId: doctor.id, weekday: wd, label: "Evening", startTime: "17:10", endTime: "20:00", slotMinutes, walkinQuota: 10 } });
   }
   await db.staffUser.create({ data: { clinicId: clinic.id, name: "Dr. Sharma", waPhone: encrypt(SEED.doctorPhone), phoneHash: phoneHash(SEED.doctorPhone), role: "DOCTOR" } });
   await db.staffUser.create({ data: { clinicId: clinic.id, name: "Priya", waPhone: encrypt(SEED.staffPhone), phoneHash: phoneHash(SEED.staffPhone), role: "STAFF" } });

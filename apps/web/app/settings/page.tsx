@@ -9,7 +9,10 @@ const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function Settings() {
   const [tab, setTab] = useState<Tab>("clinic");
-  const tabs: [Tab, string][] = [["clinic", "Clinic"], ["sessions", "Sessions"], ["closures", "Holidays & leave"], ["staff", "Staff"], ["model", "Language model"], ["qr", "Walk-in QR & TV"]];
+  // "Language model" is for Incolo's internal admins only, never for clinic staff.
+  const [incolo, setIncolo] = useState(false);
+  useEffect(() => { api<{ incoloAdmin?: boolean }>("/api/me").then((m) => setIncolo(!!m?.incoloAdmin)).catch(() => undefined); }, []);
+  const tabs: [Tab, string][] = [["clinic", "Clinic"], ["sessions", "Sessions"], ["closures", "Holidays & leave"], ["staff", "Staff"], ...(incolo ? [["model", "Language model"] as [Tab, string]] : []), ["qr", "Walk-in QR & TV"]];
   return (
     <Shell active="/settings">
       <h1>Settings</h1>
@@ -18,7 +21,7 @@ export default function Settings() {
       {tab === "sessions" && <SessionsTab />}
       {tab === "closures" && <ClosuresTab />}
       {tab === "staff" && <StaffTab />}
-      {tab === "model" && <ModelTab />}
+      {tab === "model" && incolo && <ModelTab />}
       {tab === "qr" && <QrTab />}
     </Shell>
   );
@@ -29,7 +32,7 @@ function useSaved() {
   return { state, ok: (m = "Saved") => setState({ ok: m }), err: (m: string) => setState({ err: m }), clear: () => setState({}) };
 }
 
-interface ClinicData { name: string; addressShort: string; addressFull: string; mapsUrl: string | null; phone: string; doctorName: string; qualification: string | null; settings: Record<string, unknown> & { fees?: string; windowDays?: number; cutoffMinutes?: number; walkinOverflowTimeoutMinutes?: number; turnNearThreshold?: number; flowsEnabled?: boolean } }
+interface ClinicData { name: string; addressShort: string; addressFull: string; mapsUrl: string | null; phone: string; doctorName: string; qualification: string | null; settings: Record<string, unknown> & { fees?: string; windowDays?: number; cutoffMinutes?: number; walkinOverflowTimeoutMinutes?: number; turnNearThreshold?: number; flowsEnabled?: boolean; slotPicker?: "page" | "chat" } }
 
 function ClinicTab() {
   const [d, setD] = useState<ClinicData | null>(null);
@@ -56,7 +59,14 @@ function ClinicTab() {
         <div style={{ flex: 1 }}><label>Walk-in staff reply timeout (min)</label><input type="number" value={d.settings.walkinOverflowTimeoutMinutes ?? 5} onChange={(e) => setS("walkinOverflowTimeoutMinutes", Number(e.target.value))} /></div>
         <div style={{ flex: 1 }}><label>"Turn near" alert when ahead ≤</label><input type="number" value={d.settings.turnNearThreshold ?? 2} onChange={(e) => setS("turnNearThreshold", Number(e.target.value))} /></div>
       </div>
-      <label><input type="checkbox" style={{ width: "auto", minHeight: 0 }} checked={d.settings.flowsEnabled !== false} onChange={(e) => setS("flowsEnabled", e.target.checked)} /> Use the WhatsApp booking form when no slot is near the requested time</label>
+      <fieldset className="picker-choice">
+        <legend>How patients pick a time</legend>
+        <label><input type="radio" name="slotPicker" checked={(d.settings.slotPicker ?? "page") === "page"} onChange={() => setS("slotPicker", "page")} />
+          <span><b>Booking page</b><br /><span className="small muted">A "Choose date &amp; time" button opens one screen: swipe through dates and Morning / Evening slots, then confirm.</span></span></label>
+        <label><input type="radio" name="slotPicker" checked={d.settings.slotPicker === "chat"} onChange={() => setS("slotPicker", "chat")} />
+          <span><b>In the chat</b><br /><span className="small muted">The bot suggests the nearest times as buttons; "See all slots" lists Morning or Evening times.</span></span></label>
+        <p className="small muted" style={{ margin: "6px 0 0" }}>Either way, a patient can just type a time, and nothing is booked before they confirm.</p>
+      </fieldset>
       <button className="primary" style={{ marginTop: 14 }} onClick={async () => {
         try { await api("/api/settings/clinic", { method: "PUT", body: { name: d.name, addressShort: d.addressShort, addressFull: d.addressFull, mapsUrl: d.mapsUrl, phone: d.phone, doctorName: d.doctorName, qualification: d.qualification, settings: d.settings } }); s.ok(); }
         catch { s.err("Couldn't save. Check the fields."); }

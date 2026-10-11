@@ -17,10 +17,10 @@ const LINKS = [
   { href: "/appointments", label: "Appointments", icon: I.appts },
   { href: "/reports", label: "Reports", icon: I.reports, doctor: true },
   { href: "/settings", label: "Settings", icon: I.settings, doctor: true },
-  { href: "/demo", label: "Demo Studio", icon: I.demo, doctor: true },
+  { href: "/demo", label: "Demo Studio", icon: I.demo, doctor: true, incolo: true },
 ];
 
-interface Me { name: string; role: string }
+interface Me { name: string; role: string; incoloAdmin?: boolean }
 interface ClinicLite { name: string; isDemo?: boolean }
 
 export function Shell({ active, children, title, actions }: { active: string; children: React.ReactNode; title?: React.ReactNode; actions?: React.ReactNode }) {
@@ -33,7 +33,7 @@ export function Shell({ active, children, title, actions }: { active: string; ch
     window.addEventListener("clinicq:clinic-changed", loadClinic);
     return () => window.removeEventListener("clinicq:clinic-changed", loadClinic);
   }, []);
-  const links = LINKS.filter((l) => !l.doctor || me?.role === "DOCTOR");
+  const links = LINKS.filter((l) => (!l.doctor || me?.role === "DOCTOR") && (!("incolo" in l) || me?.incoloAdmin));
   return (
     <div className="app">
       <aside className="rail" aria-label="Main">

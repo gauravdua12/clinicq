@@ -10,6 +10,7 @@ type Msg =
   | { kind: "buttons"; body: string; buttons: { id: string; title: string }[] }
   | { kind: "list"; body: string; button: string; sections: { title: string; rows: { id: string; title: string }[] }[] }
   | { kind: "flow"; body: string; cta: string }
+  | { kind: "cta_url"; body: string; displayText: string; url: string }
   | { kind: "contact"; name: string; phone: string }
   | { kind: "template"; name: string; bodyParams: string[]; quickReplyPayloads?: string[] };
 interface Out { id: string; to: string; at: number; msg: Msg }

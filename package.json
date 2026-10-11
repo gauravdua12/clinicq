@@ -13,7 +13,7 @@
     "dev": "node scripts/dev.mjs",
     "build": "npm run db:generate && npm run build -w @clinicq/web && node scripts/build-server.mjs",
     "start": "node apps/server/dist/main.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:boundary": "vitest run --project boundary",

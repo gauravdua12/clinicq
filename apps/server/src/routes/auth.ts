@@ -24,6 +24,24 @@ export async function requireStaff(ctx: Ctx, req: FastifyRequest, reply: Fastify
   return staff;
 }
 
+/**
+ * Incolo's internal admins (INCOLO_ADMIN_PHONES): the only people who see the language-model settings and Demo Studio.
+ * A clinic's doctor is an admin of their clinic, not of the platform. On a dev machine (dev tools, not production)
+ * doctors count as internal admins so everything can be tried locally.
+ */
+export function isIncoloAdmin(ctx: Ctx, staff: StaffUser): boolean {
+  const list = ctx.env.INCOLO_ADMIN_PHONES.split(",").map((p) => normalizeIndianPhone(p)).filter(Boolean);
+  if (list.includes(decrypt(staff.waPhone))) return true;
+  return ctx.env.DEV_TOOLS && ctx.env.NODE_ENV !== "production" && staff.role === "DOCTOR";
+}
+
+export async function requireIncoloAdmin(ctx: Ctx, req: FastifyRequest, reply: FastifyReply): Promise<StaffUser | null> {
+  const s = await requireStaff(ctx, req, reply);
+  if (!s) return null;
+  if (!isIncoloAdmin(ctx, s)) { reply.code(403).send({ error: { code: "forbidden" } }); return null; }
+  return s;
+}
+
 async function startSession(ctx: Ctx, reply: FastifyReply, staffId: string): Promise<void> {
   const sid = randomBytes(32).toString("base64url");
   await ctx.db.staffSession.create({ data: { id: sha(sid), staffId, expiresAt: new Date(ctx.clock.now().getTime() + SESSION_HOURS * 3600_000) } });
@@ -69,7 +87,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> 
 
   app.get("/api/me", async (req, reply) => {
     const s = await requireStaff(ctx, req, reply);
-    return s ? { name: s.name, role: s.role } : undefined;
+    return s ? { name: s.name, role: s.role, incoloAdmin: isIncoloAdmin(ctx, s) } : undefined;
   });
 
   if (ctx.env.DEV_TOOLS && ctx.env.NODE_ENV !== "production") {

@@ -44,7 +44,7 @@ export async function harness(opts: { start: string; primary?: ModelHandle | nul
   const { app, ctx } = built;
   if (opts.primary !== undefined) ctx.cascade = async () => ({ primary: opts.primary ?? null, escalation: null, minConfidence: 0.7, timeoutMs: 5000 });
   await truncateAll(db);
-  await seed(db, { displayKey: "test-key" });
+  await seed(db, { displayKey: "test-key", slotMinutes: 20 }); // fixtures are written against 20-minute slots
   const { invalidateClinicCache } = await import("../src/services/clinic");
   invalidateClinicCache();
 

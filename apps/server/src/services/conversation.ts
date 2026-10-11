@@ -651,6 +651,7 @@ async function offer(t: Turn): Promise<void> {
 }
 
 function flowReady(t: Turn): boolean {
+  if (t.info.settings.slotPicker === "chat") return false; // the clinic chose the in-chat format
   if (t.conv.pickerFailedAt && t.ctx.clock.now().getTime() - t.conv.pickerFailedAt < 3600_000) return false;
   return t.ctx.env.BOOKING_PAGE || !!(t.info.settings.flowsEnabled && t.ctx.env.WA_FLOW_ID_BOOKING && t.ctx.flowKey);
 }

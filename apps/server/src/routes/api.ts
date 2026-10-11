@@ -14,7 +14,7 @@ import { decideOverflow, walkinLink } from "../services/walkin";
 import { ClinicSettings } from "../settings";
 import { activateDemo, createDemo, deleteDemo, extractProfile, resetDemo, type ClinicProfile } from "../services/demo";
 import type { AiRuntime } from "../services/ai";
-import { requireStaff } from "./auth";
+import { requireIncoloAdmin, requireStaff } from "./auth";
 
 // REST API for the dashboard and TV (docs/API.md). Phone numbers never appear in list views.
 
@@ -281,7 +281,7 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
   const DemoIn = z.object({ name: z.string().trim().min(2).max(80), website: z.string().trim().max(300).optional().or(z.literal("")), details: z.string().max(8000).optional(), doctorName: z.string().max(60).optional(), specialty: z.string().max(60).optional() });
   const demoGuard = async (req: Parameters<typeof requireStaff>[1], reply: FastifyReply) => {
     if (!ctx.env.DEMO_STUDIO) { sendErr(reply, 404, "not_found"); return null; }
-    return requireStaff(ctx, req, reply, "DOCTOR");
+    return requireIncoloAdmin(ctx, req, reply);
   };
   app.get("/api/demo", async (req, reply) => {
     if (!(await demoGuard(req, reply))) return;
@@ -323,13 +323,13 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
     };
   });
 
-  // ── language model (admin only) ──
+  // ── language model (Incolo internal admins only) ──
   app.get("/api/settings/ai", async (req, reply) => {
-    if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return;
+    if (!(await requireIncoloAdmin(ctx, req, reply))) return;
     return { config: await ai.config(), catalog: ai.catalog() };
   });
   app.put("/api/settings/ai", async (req, reply) => {
-    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
+    const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
     const r = await ai.update(req.body, s.id);
     return r.saved ? r : reply.code(422).send(r);
   });
