@@ -22,6 +22,7 @@ units() {
   install -m 644 "$APP/deploy/clinicq.service" /etc/systemd/system/clinicq.service
   install -m 644 "$APP/deploy/clinicq-caddy.service" /etc/systemd/system/clinicq-caddy.service
   install -m 755 "$APP/deploy/demo-switch.sh" /usr/local/bin/demo-switch
+  install -d -o clinicq -g clinicq /opt/clinicq/caddy && chown -R clinicq:clinicq /opt/clinicq/caddy
   systemctl daemon-reload
 }
 caddy_bin() {
@@ -50,7 +51,8 @@ if [ "${1:-}" = first ]; then
   caddy_bin
   install -d -o clinicq -g clinicq /opt/clinicq/caddy
   units
-  /opt/clinicq/bin/caddy validate --config "$APP/deploy/Caddyfile" --adapter caddyfile >/dev/null 2>&1 && echo "Caddyfile valid"
+  # Validate as the service user: anything Caddy creates (log, storage) must belong to clinicq.
+  $AS /opt/clinicq/bin/caddy validate --config "$APP/deploy/Caddyfile" --adapter caddyfile >/dev/null 2>&1 && echo "Caddyfile valid"
   echo "Installed. Make ClinicQ the live demo with: sudo demo-switch clinicq"
   exit 0
 fi
