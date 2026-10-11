@@ -133,3 +133,18 @@ node scripts/build-server.mjs                        # then start dist/main.js o
 npx tsx scripts/load/run.ts                          # load + abuse
 npx tsx scripts/load/live.ts --n 300 --c 150         # live-AI load (server on :8098 with live .env)
 ```
+
+## Update: 11 Oct 2026, evening (after real-phone feedback)
+| Layer | Result |
+|---|---|
+| Automated (unit, integration, e2e, data boundary) | ✅ 119/119 |
+| UI in real Chrome, including the booking page at phone size | ✅ 12/12 |
+| User-level, live AI | ✅ 29/29 (new: hi mid-booking, changes mind, returns after 40 minutes, new booking mid-flow) |
+| AI evaluation, 210 cases, cascade | 95.7% all-fields; 100% health and emergency recall |
+| Live server check (`scripts/ops/live-check.ts`) | ✅ 18/18, including the booking page API |
+
+New in this round:
+- the booking page (form D), and sessions with a set number of slots (50+ tested);
+- a final "Confirm booking" step, and the console switch between the booking page and the in-chat format;
+- the language model and Demo Studio restricted to Incolo's internal admins, and 15-minute default slots;
+- the 30-minute reset with notice, and changing course mid-booking.
