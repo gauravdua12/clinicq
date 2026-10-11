@@ -9,7 +9,8 @@ export interface TemplateDef {
 }
 
 export const TEMPLATES = {
-  appointment_confirmed: { name: "appointment_confirmed", category: "UTILITY", params: ["name", "dayShort", "time", "token", "addressShort"], quickReplies: ["appt:rs", "appt:cx"] },
+  // Meta name differs from the key: the first wording was mis-categorised by Meta, so it was resubmitted under a new name.
+  appointment_confirmed: { name: "booking_confirmation", category: "UTILITY", params: ["name", "dayShort", "time", "token", "addressShort"], quickReplies: ["appt:rs", "appt:cx"] },
   reminder_24h: { name: "reminder_24h", category: "UTILITY", params: ["name", "doctor", "dayShort", "time", "token"], quickReplies: ["appt:ok", "appt:rs", "appt:cx"] },
   reminder_same_day: { name: "reminder_same_day", category: "UTILITY", params: ["time", "name", "token", "runningStatus", "addressShort"], quickReplies: ["appt:late", "appt:cx"] },
   cancelled_by_clinic: { name: "cancelled_by_clinic", category: "UTILITY", params: ["name", "date", "time", "clinicPhone"], quickReplies: ["menu:book"] },

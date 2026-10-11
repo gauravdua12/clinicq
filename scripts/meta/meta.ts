@@ -79,13 +79,14 @@ if (cmd === "check") {
       const t = TEMPLATE_TEXT[name as keyof typeof TEMPLATE_TEXT][lang];
       const components: unknown[] = [{ type: "BODY", text: t.body, example: { body_text: [t.examples] } }];
       if (t.buttons?.length) components.push({ type: "BUTTONS", buttons: t.buttons });
-      const cur = existing.get(`${name}/${lang}`);
-      if (cur && cur.status !== "REJECTED") { console.log(`${name}/${lang}: ${cur.status}`); continue; }
+      const metaName = def.name; // may differ from our key (e.g. a template renamed after a rejection)
+      const cur = existing.get(`${metaName}/${lang}`);
+      if (cur && cur.status !== "REJECTED") { console.log(`${metaName}/${lang}: ${cur.status}`); continue; }
       // A rejected template is edited in place (its name can't be reused for a new one).
       const r = cur
         ? await g(cur.id, { body: { category: def.category, components } }).then((x) => ({ ...x, edited: true })).catch((e) => ({ error: String(e) }))
-        : await g(`${WABA}/message_templates`, { body: { name, language: lang, category: def.category, components } }).catch((e) => ({ error: String(e) }));
-      console.log(`${name}/${lang} →`, JSON.stringify(r));
+        : await g(`${WABA}/message_templates`, { body: { name: metaName, language: lang, category: def.category, components } }).catch((e) => ({ error: String(e) }));
+      console.log(`${metaName}/${lang} →`, JSON.stringify(r));
     }
   }
 } else if (cmd === "flow") {

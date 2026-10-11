@@ -53,7 +53,7 @@
 Submit each in `en` and `hi`. Variables are positional. Keep wording non-promotional: no offers, no "visit us", no health claims. The Hindi text mirrors the English.
 | Name | Body (en) | Buttons |
 |---|---|---|
-| `appointment_confirmed` | "Your appointment is confirmed. {{1}}, {{2}} at {{3}}, Token {{4}}. Location: {{5}}" | QR: Reschedule, Cancel |
+| `booking_confirmation` (key `appointment_confirmed`) | "Booking confirmed. Patient: {{1}} / Date: {{2}} / Time: {{3}} / Token number: {{4}} / Clinic: {{5}} / To reschedule or cancel this booking, tap a button below." | QR: Reschedule, Cancel |
 | `reminder_24h` | "Reminder: {{1}} ji, your appointment with {{2}} is tomorrow, {{3}} at {{4}} (Token {{5}})." | QR: Confirm, Reschedule, Cancel |
 | `reminder_same_day` | "Today at {{1}}: {{2}} ji's appointment (Token {{3}}). Doctor is {{4}}. Location: {{5}}" | QR: Running late, Cancel |
 | `cancelled_by_clinic` | "Sorry {{1}} ji, Doctor is unavailable on {{2}}. Your {{3}} appointment is cancelled. Please pick a new time or call {{4}}." | QR: Pick new time; PHONE_NUMBER: Call clinic |

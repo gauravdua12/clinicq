@@ -14,7 +14,7 @@ const qr = (...t: string[]) => t.map((text) => ({ type: "QUICK_REPLY" as const, 
 
 export const TEMPLATE_TEXT: Record<Exclude<TemplateName, "staff_login_otp">, Record<Lang, TemplateText>> = {
   appointment_confirmed: {
-    en: { body: "Hello {{1}}, your appointment is confirmed for {{2}} at {{3}}. Your token number is {{4}}.\nClinic address: {{5}}\nTo reschedule or cancel this appointment, reply to this message at any time.", examples: ["Sunita", "Sat 10 Oct", "6:10 PM", "A-4", "Sector 15, Gurugram"], buttons: qr("Reschedule", "Cancel") },
+    en: { body: "Booking confirmed.\nPatient: {{1}}\nDate: {{2}}\nTime: {{3}}\nToken number: {{4}}\nClinic: {{5}}\nTo reschedule or cancel this booking, tap a button below.", examples: ["Sunita", "Sat 10 Oct", "6:10 PM", "A-4", "Sector 15, Gurugram"], buttons: qr("Reschedule", "Cancel") },
     hi: { body: "आपका अपॉइंटमेंट कन्फ़र्म है।\n{{1}}, {{2}} को {{3}} बजे\nटोकन {{4}}\nपता: {{5}}\nरी-शेड्यूल या कैंसल के लिए कभी भी यहाँ जवाब दें।", examples: ["सुनीता", "शनि 10 अक्टू", "6:10 PM", "A-4", "सेक्टर 15, गुरुग्राम"], buttons: qr("री-शेड्यूल", "कैंसल") },
   },
   reminder_24h: {
