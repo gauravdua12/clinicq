@@ -220,7 +220,7 @@ export async function seedDemoActivity(ctx: Ctx, clinicId: string): Promise<void
     for (const s of sessions.filter((x) => x.weekday === T.weekdayOf(date))) {
       const start = T.toMin(s.startTime);
       const end = T.toMin(s.endTime);
-      for (let m = start, i = 0; m + s.slotMinutes <= end; m += s.slotMinutes, i++) {
+      for (let m = start, i = 0; m + s.slotMinutes <= end && (!s.maxSlots || i < s.maxSlots); m += s.slotMinutes, i++) {
         if (i % 3 !== 1) continue; // about a third of slots booked
         if (day === 0 && m <= nowMin + 30) continue;
         const at = T.toInstant(date, m, ctx.tz);

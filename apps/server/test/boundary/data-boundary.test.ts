@@ -39,6 +39,7 @@ describe("data boundary", () => {
     await h.say(PATIENT, "papa ko chest pain ho raha hai");
     await h.say(PATIENT, "Monday 10:20");
     await h.tap(PATIENT, "vt:REPORT_SHOW");
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     await h.say(PATIENT, "mera number kab aayega CANARY7f3a");
     await h.flow(PATIENT, { slot: "2026-10-12|660", note: "CANARY7f3a injected" });
   });

@@ -40,6 +40,7 @@ describe("Demo Studio", () => {
     await h.db.patientProfile.create({ data: { accountId: (await h.db.patientAccount.findFirstOrThrow()).id, name: (await import("@clinicq/db")).encrypt("Ramesh Kumar"), relation: "SELF" } });
     await h.say(PATIENT, "book tomorrow 6:10 pm for me");
     await h.tap(PATIENT, "vt:NEW");
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     const { clinic } = await createDemo(h.ctx, { name: PROFILE.clinicName }, null, PROFILE);
     // In the demo the patient has no bookings with this clinic.
     await h.say(PATIENT, "when is my appointment?");

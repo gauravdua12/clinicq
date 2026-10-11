@@ -29,6 +29,7 @@ const say = (body: string, o?: { wamid?: string; ageMin?: number }) => post({ ty
 const tap = (id: string) => post({ type: "interactive", interactive: { type: "button_reply", button_reply: { id, title: id } } });
 const account = () => db.patientAccount.findUnique({ where: { phoneHash: phoneHash(FROM) } });
 const state = async () => { const a = await account(); return a ? (await db.conversationState.findUnique({ where: { accountId: a.id } }))?.state ?? "IDLE" : "NONE"; };
+const booked_ = async () => booked();
 const booked = async () => { const a = await account(); return a ? db.appointment.findMany({ where: { status: "BOOKED", profile: { accountId: a.id } } }) : []; };
 
 // Tomorrow in IST at CHECK_SLOT (default 18:10, an exact slot in the demo clinic); parallel runs use different slots.
@@ -60,6 +61,7 @@ try {
     else if (s === "BK_WHEN" || s === "IDLE") await say(`kal ${spoken} mummy ke liye`);
     else if (s === "BK_PICK_SLOT") await tap(`slot:${tomorrow}|${slotMin}`);
     else if (s === "BK_VISIT_TYPE") await tap("vt:NEW");
+    else if (s === "BK_CONFIRM") await tap("bk:yes");
     else if (s === "BK_SAME_FAMILY") await tap("who:other");
     else break;
   }
@@ -89,7 +91,32 @@ try {
   check("stale re-delivery (2 h old) accepted by webhook", (await say("kal subah 11 baje appointment", { ageMin: 120 })) === 200);
   check("stale re-delivery not acted on", (await db.appointment.count()) === appCountBefore && (await booked()).length >= before);
 
-  // 5. Erasure through the bot itself (also cleans up this check)
+  // 5. Booking page (form D): the link the bot sends, its API, and a confirmed booking through it
+  if ((await state()) === "BK_VISIT_TYPE") await tap("vt:NEW"); // finish what the duplicate-check message started
+  if ((await state()) === "BK_CONFIRM") await tap("bk:yes");
+  await say("ek aur appointment chahiye mere liye");
+  if ((await state()) === "BK_WHO") await tap("who:me");
+  const accNow = await account();
+  const link = accNow ? await db.flowToken.findFirst({ where: { accountId: accNow.id }, orderBy: { expiresAt: "desc" } }) : null;
+  check("booking link created for the patient", !!link, link ? undefined : `state ${await state()}`);
+  if (link) {
+    const info = await (await fetch(`${BASE}/api/book/${link.token}`)).json() as { dates: { date: string; enabled: boolean }[] };
+    const open = info.dates.filter((d) => d.enabled).map((d) => d.date);
+    let booked = false;
+    for (const d of open.slice(1, 4)) {
+      const day = await (await fetch(`${BASE}/api/book/${link.token}/day/${d}`)).json() as { sessions: { slots: { min: number; free: boolean }[] }[] };
+      const free = day.sessions.flatMap((x) => x.slots).find((x) => x.free);
+      if (!free) continue;
+      const before = (await booked_()).length;
+      const r = await fetch(`${BASE}/api/book/${link.token}/confirm`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ date: d, min: free.min, visitType: "NEW" }) });
+      booked = r.status === 200 && (await booked_()).length === before + 1;
+      break;
+    }
+    check("booking page: dates, slots and confirm work", booked);
+    check("booking link works only once", (await fetch(`${BASE}/api/book/${link.token}`)).status === 410);
+  }
+
+  // 6. Erasure through the bot itself (also cleans up this check)
   await say("delete my data");
   if ((await state()) === "ERASE_CONFIRM") await tap("erase:yes");
   check("patient erased their data via WhatsApp", (await account()) === null);

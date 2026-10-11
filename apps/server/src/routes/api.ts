@@ -216,7 +216,7 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
   app.get("/api/settings/sessions", async (req, reply) => { if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return; const info = await clinicInfo(ctx); return ctx.db.session.findMany({ where: { doctorId: info.doctor.id }, orderBy: [{ weekday: "asc" }, { startTime: "asc" }] }); });
   app.put("/api/settings/sessions", async (req, reply) => {
     const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
-    const Sess = z.object({ weekday: z.number().int().min(0).max(6), label: z.string().min(1).max(20), startTime: z.string().regex(/^\d{2}:\d{2}$/), endTime: z.string().regex(/^\d{2}:\d{2}$/), slotMinutes: z.number().int().min(5).max(120), walkinQuota: z.number().int().min(0).max(200) });
+    const Sess = z.object({ weekday: z.number().int().min(0).max(6), label: z.string().min(1).max(20), startTime: z.string().regex(/^\d{2}:\d{2}$/), endTime: z.string().regex(/^\d{2}:\d{2}$/), slotMinutes: z.number().int().min(1).max(120), maxSlots: z.number().int().min(1).max(300).nullable().optional(), walkinQuota: z.number().int().min(0).max(200) });
     const b = z.array(Sess).safeParse(req.body);
     if (!b.success) return sendErr(reply, 400, "bad_request");
     for (const x of b.data) if (T.toMin(x.endTime) <= T.toMin(x.startTime)) return sendErr(reply, 400, "end_before_start");

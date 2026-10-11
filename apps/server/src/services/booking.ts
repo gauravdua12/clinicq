@@ -57,7 +57,7 @@ export async function appointmentToken(ctx: Ctx, info: ClinicInfo, appt: Appoint
   if (ts.singleSeries) return String(await allocateToken(tx, info.doctor.id, date, appt.sessionId, "N"));
   if (ts.appointmentTokenMode === "sequential") return `${ts.appointmentPrefix}-${await allocateToken(tx, info.doctor.id, date, appt.sessionId, "A")}`;
   const sess = sessionForSlot(info, appt.sessionId);
-  const idx = sess ? S.generateSlots(date, { id: sess.id, weekday: sess.weekday, label: sess.label, startTime: sess.startTime, endTime: sess.endTime, slotMinutes: sess.slotMinutes, walkinQuota: sess.walkinQuota })
+  const idx = sess ? S.generateSlots(date, { id: sess.id, weekday: sess.weekday, label: sess.label, startTime: sess.startTime, endTime: sess.endTime, slotMinutes: sess.slotMinutes, maxSlots: sess.maxSlots, walkinQuota: sess.walkinQuota })
     .findIndex((s) => s.startMin === T.localMinutes(appt.slotStart, ctx.tz)) : -1;
   return `${ts.appointmentPrefix}-${idx + 1}`;
 }

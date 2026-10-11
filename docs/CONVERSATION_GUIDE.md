@@ -272,3 +272,10 @@ Sent from a whitelisted number to the clinic number. Case-insensitive; Hindi ali
 | `SUMMARY` | today's numbers | |
 | `HELP` | list commands | |
 | Overflow replies | buttons on `staff_walkin_overflow` | |
+
+## Update 11 Oct 2026 (real-phone feedback)
+- **Final confirmation:** after the visit type, the bot shows a summary (patient, date, time, visit, clinic) with **Confirm booking / Change time**. Nothing is booked before "Confirm booking". On the booking page, the confirm sheet plays the same role.
+- **Booking page:** "book appointment" with no time named sends the **Choose date & time** button (`BOOK_LINK_BODY`). A patient can still type a time instead.
+- **Short replies after a finished action** ("ok", "sure", "no") get `ACK_CLOSING`, not the menu.
+- **Queue status without a booking today** starts "Queue status is visible for your bookings only". If there is a later booking, the reply shows it (`STATUS_FUTURE`).
+- **Visit type:** the question explains the options, and the button is "Report review". The confirmation shows the visit type.

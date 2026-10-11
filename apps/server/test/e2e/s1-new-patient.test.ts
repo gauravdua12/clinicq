@@ -21,7 +21,10 @@ describe("S1 new patient booking", () => {
     expect((await h.kinds(PATIENT)).at(-1)).toBe("ASK_WHO");
 
     await h.say(PATIENT, "for my mother, Sunita");
-    expect((await h.kinds(PATIENT)).slice(-2)).toEqual(["ACK_PROFILE", "ASK_WHEN"]);
+    expect((await h.kinds(PATIENT)).slice(-2)).toEqual(["ACK_PROFILE", "BOOK_LINK"]); // "Choose date & time" opens the booking page
+    const link = h.wa.last(PATIENT);
+    expect(link?.kind === "cta_url" && link.url).toMatch(/\/book\?t=[\w-]{20,}$/);
+    // …or the patient simply types a time in the chat:
 
     await h.say(PATIENT, "kal shaam 6 baje ke aas paas");
     expect((await h.kinds(PATIENT)).at(-1)).toBe("OFFER_NEAR_SLOTS");
@@ -33,6 +36,9 @@ describe("S1 new patient booking", () => {
     expect((await h.kinds(PATIENT)).at(-1)).toBe("ASK_VISIT_TYPE");
 
     await h.tap(PATIENT, "vt:NEW");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("CONFIRM_BOOKING_ASK"); // nothing booked until confirmed
+    expect(await h.db.appointment.count({ where: { status: "BOOKED" } })).toBe(0);
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     expect((await h.kinds(PATIENT)).at(-1)).toBe("BOOKING_CONFIRMED");
     expect(h.lastText(PATIENT)).toMatch(/Sunita ji/);
     expect(h.lastText(PATIENT)).toMatch(/Token \*A-4\*/);

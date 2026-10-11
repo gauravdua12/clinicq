@@ -18,19 +18,24 @@ If the app you switch to doesn't come up healthy, the script puts the previous o
 ## 3. Show it
 Your number (9920323832) is the demo **presenter**: it's both a patient and the clinic's doctor. Plain messages go to the patient side. Desk commands start with **#**: `#next`, `#status`, `#add Ramesh`, `#late 15`, `#summary`. Send `#` alone to see them all.
 
-1. **Patient side:** from your phone, message the number "Hi", agree to the privacy notice, then type or say (voice note) something like *"kal shaam 6 baje mummy ke liye appointment"*.
+1. **Patient side:** from your phone, message the number "Hi" and agree to the privacy notice. Then either:
+   - type or say (voice note) a time, e.g. *"kal shaam 6 baje mummy ke liye appointment"*. The bot suggests the nearest slots, asks the visit type, then asks you to **Confirm booking**; or
+   - just say *"book appointment"*. The bot sends a **Choose date & time** button that opens the **booking page** inside WhatsApp: swipe through dates, swipe through the Morning / Evening slots (booked ones greyed out), pick the visit type, then **Continue → Confirm booking**. The confirmation arrives in the chat too.
 2. **Desk side:** open https://q.incolo.si/login and enter 9920323832. The login code arrives on WhatsApp. Until Meta approves the login-code template, it comes as a normal message, which requires that you messaged the bot in the last 24 hours (step 1 covers this).
 3. **The queue (today's patients):** book for *today* (e.g. *"aaj shaam 7 baje"*), then either reply *"I've reached"* from the phone or tap **Arrived** on the Appointments page. The patient joins the board as Waiting. Use **+ Add walk-in** for walk-ins. **Send next patient in**, then **✓ Consultation completed**. The patient gets "it's your turn" on WhatsApp. Open the waiting-room TV from Settings → **Walk-in QR & TV** → Open display.
 4. **A prospect's own clinic in a minute:** go to Demo Studio (https://q.incolo.si/demo), enter the clinic name, its website or text from its prospectus, then **Create demo** and **Make active**. The bot and the dashboard now act as that clinic. Switch back by making the default clinic active again.
 
-## 4. Still waiting on Meta
+## 4. Number of slots
+Settings → **Sessions**: for each session set the hours and either the **number of slots** patients should see (e.g. 50; the slot length is worked out for you) or the slot length. The booking page shows every slot, up to any number, in sideways-scrolling columns with hour markers.
+
+## 5. Still waiting on Meta
 | Item | Status | What it unlocks |
 |---|---|---|
 | 24 message templates (EN + HI) | Pending review | Reminders and alerts outside the 24-hour window. Chat replies work already |
-| Business verification (Incolo Systems) | Not started | Publishing the booking form (slot grid), the login-code template, and the limit going from 250 to 2,000 conversations a day |
+| Business verification (Incolo Systems) | Not started | The login-code template, and the limit going from 250 to 2,000 conversations a day. (The booking page doesn't need it.) |
 | Permanent token | The current one expires 9 Dec 2026 | Regenerate with "Never" and update `/clinicq/WA_ACCESS_TOKEN` in Parameter Store, then run `sudo /opt/clinicq/app/deploy/install.sh update` |
 
-## 5. Health and updates
+## 6. Health and updates
 - Health: https://q.incolo.si/healthz shows `{"ok":true,"db":true}`.
 - Full post-deploy check (about 30 s, cleans up after itself):
   `sudo -u clinicq -H bash -c 'set -a; . /etc/clinicq/clinicq.env; set +a; cd /opt/clinicq/app && npx tsx scripts/ops/live-check.ts'`

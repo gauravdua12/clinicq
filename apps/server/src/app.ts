@@ -18,6 +18,7 @@ import { apiRoutes } from "./routes/api";
 import { authRoutes } from "./routes/auth";
 import { devRoutes } from "./routes/dev";
 import { eventRoutes } from "./routes/events";
+import { bookRoutes } from "./routes/book";
 import { flowRoutes } from "./routes/flow";
 import { webhookRoutes } from "./routes/webhook";
 import { AiRuntime } from "./services/ai";
@@ -71,6 +72,7 @@ export async function buildApp(opts: BuildOpts): Promise<{ app: FastifyInstance;
 
     await webhookRoutes(scope, ctx);
     await flowRoutes(scope, ctx);
+    await bookRoutes(scope, ctx);
     await authRoutes(scope, ctx);
     await apiRoutes(scope, ctx, ai);
     await eventRoutes(scope, ctx);

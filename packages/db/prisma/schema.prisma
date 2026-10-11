@@ -54,6 +54,7 @@ model Session {
   startTime   String
   endTime     String
   slotMinutes Int
+  maxSlots    Int?
   walkinQuota Int
   active      Boolean @default(true)
 

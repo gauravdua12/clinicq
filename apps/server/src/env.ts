@@ -21,6 +21,7 @@ export const EnvSchema = z.object({
   WA_GRAPH_VERSION: z.string().default("v23.0"),
   WA_FLOW_ID_BOOKING: z.string().optional(),
   WA_FLOW_MODE: z.enum(["published", "draft"]).default("published"),
+  BOOKING_PAGE: bool.default(true), // form D as a page opened from WhatsApp (preferred over the native Flow)
   FLOW_PRIVATE_KEY_PATH: z.string().optional(),
   FLOW_PRIVATE_KEY_PASSPHRASE: z.string().optional(),
   AWS_REGION: z.string().default("ap-south-1"),

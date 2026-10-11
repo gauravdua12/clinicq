@@ -18,7 +18,7 @@ import { handleStaffMessage } from "./staffCommands";
 type Lang = C.Lang;
 type State =
   | "IDLE" | "AWAIT_CONSENT" | "AWAIT_NUMBER_CONFIRM" | "AWAIT_ALT_NUMBER"
-  | "BK_WHO" | "BK_NAME" | "BK_WHEN" | "BK_PICK_SLOT" | "BK_FLOW_OPEN" | "BK_VISIT_TYPE" | "BK_RACE_DECLINED" | "BK_SAME_FAMILY"
+  | "BK_WHO" | "BK_NAME" | "BK_WHEN" | "BK_PICK_SLOT" | "BK_FLOW_OPEN" | "BK_VISIT_TYPE" | "BK_CONFIRM" | "BK_RACE_DECLINED" | "BK_SAME_FAMILY"
   | "RS_PICK_APPT" | "CX_PICK_APPT" | "CX_CONFIRM" | "ERASE_CONFIRM" | "WALKIN_ASK_NAME" | "WI_AWAIT_STAFF";
 
 interface SlotRef { date: string; startMin: number }
@@ -51,6 +51,7 @@ interface Conv {
   welcomeSent?: boolean;
   emergencyAt?: number;
   lastOut?: string; // kind of the bot's last message (context for short replies like "sure", "ok")
+  pickerFailedAt?: number; // the booking page / form couldn't be delivered to this patient: use the list for a while
   seed: number;
 }
 
@@ -250,11 +251,18 @@ async function onState(t: Turn, e: Extraction): Promise<void> {
     case "BK_WHO": return answerWho(t, e);
     case "BK_NAME": return answerName(t, e);
     case "BK_WHEN": return answerWhen(t, e);
-    case "BK_PICK_SLOT": case "BK_FLOW_OPEN": return answerPick(t, e);
+    case "BK_PICK_SLOT": return answerPick(t, e);
+    case "BK_FLOW_OPEN": return answerWhen(t, e); // typed a day/time instead of using the booking page
     case "BK_VISIT_TYPE":
-      if (e.visitType) { t.conv.p.visitType = e.visitType; return finalize(t); }
+      if (e.visitType) { t.conv.p.visitType = e.visitType; return askConfirm(t); }
       if (e.date || e.time != null) return answerPick(t, e);
       return askVisitType(t);
+    case "BK_CONFIRM":
+      if (e.visitType) { t.conv.p.visitType = e.visitType; return askConfirm(t); }
+      if (e.date || e.time != null) return answerPick(t, e);
+      if (e.intent === "AFFIRM" || e.intent === "BOOK") return finalize(t);
+      if (e.intent === "DENY") return changeTime(t);
+      return askConfirm(t);
     case "BK_RACE_DECLINED":
       if (e.date || e.time != null || e.partOfDay) { mergeWhen(t, e); return offer(t); }
       if (e.intent === "AFFIRM") return askWhen(t);
@@ -380,7 +388,8 @@ async function onButton(t: Turn, id: string): Promise<void> {
     }
     case "see_all": return slotPicker(t, t.conv.requested?.date ?? nowLocal(t.ctx).date);
     case "sess": { const [date, label] = (a ?? "").split("|"); return slotPicker(t, date ?? nowLocal(t.ctx).date, false, label); }
-    case "vt": t.conv.p.visitType = a as VisitType; return finalize(t);
+    case "vt": t.conv.p.visitType = a as VisitType; return askConfirm(t);
+    case "bk": return a === "yes" ? finalize(t) : changeTime(t);
     case "who":
       if (a === "me") { t.conv.p.forWhom = "self"; t.conv.p.whoAsked = true; t.conv.p.profileId = undefined; return progressBooking(t); }
       if (a === "other") { t.conv.p.forWhom = "new_person"; t.set("BK_NAME"); return t.text("ASK_NAME_OTHER"); }
@@ -641,11 +650,9 @@ async function offer(t: Turn): Promise<void> {
   return slotPicker(t, r.hasAny ? date : (S.firstDateWithFree(date, avail) ?? date), true);
 }
 
-/** Set when Meta refuses to deliver the booking form (e.g. draft form to a non-tester): use the list for a while. */
-let flowFailedAt = 0;
-
 function flowReady(t: Turn): boolean {
-  return !!(t.info.settings.flowsEnabled && t.ctx.env.WA_FLOW_ID_BOOKING && t.ctx.flowKey) && t.ctx.clock.now().getTime() - flowFailedAt > 3600_000;
+  if (t.conv.pickerFailedAt && t.ctx.clock.now().getTime() - t.conv.pickerFailedAt < 3600_000) return false;
+  return t.ctx.env.BOOKING_PAGE || !!(t.info.settings.flowsEnabled && t.ctx.env.WA_FLOW_ID_BOOKING && t.ctx.flowKey);
 }
 
 /** Form D: the WhatsApp booking form (date chips, Morning / Evening slot chips). */
@@ -654,9 +661,19 @@ async function openFlow(t: Turn): Promise<void> {
   const token = randomBytes(24).toString("base64url");
   await t.ctx.db.flowToken.create({ data: { token, accountId: t.acc.id, profileId: t.conv.p.profileId ?? null, expiresAt: new Date(t.ctx.clock.now().getTime() + 15 * 60_000) } });
   t.set("BK_FLOW_OPEN");
+  if (t.ctx.env.BOOKING_PAGE) {
+    // The booking page: scrollable dates and Morning/Evening slots, any number of slots, confirm screen (form D).
+    await t.ctx.db.flowToken.update({ where: { token }, data: { expiresAt: new Date(t.ctx.clock.now().getTime() + 30 * 60_000) } });
+    const url = `${t.ctx.env.PUBLIC_BASE_URL}${t.ctx.env.BASE_PATH}/book?t=${token}`;
+    const ok = await t.send({ kind: "cta_url", body: t.t("BOOK_LINK_BODY", { name }), displayText: t.b("CHOOSE_DATE_TIME"), url }, "BOOK_LINK");
+    if (ok) return;
+    t.conv.pickerFailedAt = t.ctx.clock.now().getTime();
+    t.ctx.log.warn({}, "booking_link_send_failed_using_list");
+    return slotPicker(t, t.conv.requested?.date ?? nowLocal(t.ctx).date);
+  }
   const sent = await t.send({ kind: "flow", body: t.t("FLOW_BODY", { name }), cta: t.b("CHOOSE_DATE_TIME"), flowId: t.ctx.env.WA_FLOW_ID_BOOKING!, flowToken: token, screen: "PICK_DATE_SLOT", draft: t.ctx.env.WA_FLOW_MODE === "draft" }, "FLOW_BOOKING");
   if (sent) return;
-  flowFailedAt = t.ctx.clock.now().getTime();
+  t.conv.pickerFailedAt = t.ctx.clock.now().getTime();
   t.ctx.log.warn({}, "flow_send_failed_using_list");
   return slotPicker(t, t.conv.requested?.date ?? nowLocal(t.ctx).date);
 }
@@ -779,6 +796,24 @@ async function askVisitType(t: Turn): Promise<void> {
   const s = t.conv.offered?.[0];
   const head = s ? `${t.t("SLOT_HELD", { name: currentName(t), dayShort: T.fmtDayShort(s.date, t.lang), time: T.fmtTime(s.startMin) })}\n` : "";
   return t.buttons(head + t.t("ASK_VISIT_TYPE"), "ASK_VISIT_TYPE", [{ id: "vt:NEW", title: t.b("NEW") }, { id: "vt:FOLLOW_UP", title: t.b("FOLLOW_UP") }, { id: "vt:REPORT_SHOW", title: t.b("REPORT_SHOW") }]);
+}
+
+/** Nothing is booked until the patient sees the summary and confirms it. */
+async function askConfirm(t: Turn): Promise<void> {
+  const s = t.conv.offered?.[0];
+  if (!t.conv.held || !s) return finalize(t);
+  t.set("BK_CONFIRM");
+  const vt = t.conv.p.visitType ?? "NEW";
+  const visit = t.b(vt === "FOLLOW_UP" ? "FOLLOW_UP" : vt === "REPORT_SHOW" ? "REPORT_SHOW" : "NEW");
+  return t.buttons(t.t("CONFIRM_BOOKING_ASK", { name: currentName(t), dayShort: T.fmtDayShort(s.date, t.lang), time: T.fmtTime(s.startMin), visit }), "CONFIRM_BOOKING_ASK",
+    [{ id: "bk:yes", title: t.b("CONFIRM_BOOKING") }, { id: "bk:change", title: t.b("CHANGE_TIME") }]);
+}
+
+async function changeTime(t: Turn): Promise<void> {
+  const date = t.conv.offered?.[0]?.date ?? t.conv.requested?.date ?? nowLocal(t.ctx).date;
+  if (t.conv.held) { await releaseHold(t.ctx, t.conv.held); t.conv.held = undefined; }
+  t.conv.offered = undefined;
+  return slotPicker(t, date);
 }
 
 async function finalize(t: Turn): Promise<void> {
@@ -1104,3 +1139,42 @@ function whenLabel(t: Turn, e: Extraction): string {
 }
 
 export function slotAt(ctx: Ctx, date: string, min: number): Date { return slotInstant(ctx, { date, startMin: min }); }
+
+// ── booking page (opened from WhatsApp) ────────────────────────
+
+export type PageBookResult = { ok: true; apptId: string } | { ok: false; reason: "taken" | "family" | "unavailable" | "gone" };
+
+/**
+ * The patient confirmed a slot on the booking page. Runs through the same booking path as the chat (hold → confirm →
+ * WhatsApp confirmation), in order with the patient's chat messages. The page itself showed the final confirmation.
+ */
+export async function bookFromPage(ctx: Ctx, accountId: string, profileId: string, ref: SlotRef, visitType: VisitType): Promise<PageBookResult> {
+  const acc = await ctx.db.patientAccount.findUnique({ where: { id: accountId } });
+  if (!acc) return { ok: false, reason: "gone" };
+  const waId = decrypt(acc.waPhone);
+  const { processSerially } = await import("../routes/webhook");
+  let result: PageBookResult = { ok: false, reason: "unavailable" };
+  await processSerially(waId, async () => {
+    const info = await clinicInfo(ctx);
+    const avail = await windowAvailability(ctx, info);
+    const slot = S.findSlot(ref.date, ref.startMin, avail);
+    if (!slot || S.bookability(slot, avail) !== "ok") { result = { ok: false, reason: slot && S.bookability(slot, avail) === "taken" ? "taken" : "unavailable" }; return; }
+    const conv = await loadConv(ctx, acc);
+    const t = new Turn(ctx, info, acc, waId, conv, await profilesOf(ctx, acc.id));
+    if (t.conv.held) { await releaseHold(ctx, t.conv.held); t.conv.held = undefined; }
+    try {
+      const held = await holdSlot(ctx, slot, profileId, acc.id);
+      t.conv.p = { intent: "BOOK", profileId, visitType };
+      t.conv.held = held.id;
+      t.conv.offered = [ref];
+      await finalize(t);
+      await saveConv(ctx, acc.id, t.conv);
+      result = { ok: true, apptId: held.id };
+    } catch (e) {
+      if (e instanceof SlotTakenError) result = { ok: false, reason: "taken" };
+      else if (e instanceof FamilySlotError) result = { ok: false, reason: "family" };
+      else throw e;
+    }
+  });
+  return result;
+}

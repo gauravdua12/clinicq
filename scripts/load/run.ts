@@ -70,6 +70,7 @@ await run("L2 setup: consent + number", p2.flatMap((p) => [() => text(p, "Hi"), 
 await run("L2 setup: 'book appointment' → for me (now asked: which day/time)", p2.flatMap((p) => [() => text(p, "book appointment"), () => tap(p, "who:me")]), 20);
 results.push(await run("L2 storm: 200 patients answer 'tomorrow 6:10 pm' simultaneously", p2.map((p) => () => text(p, "tomorrow 6:10 pm")), 200));
 results.push(await run("L2 storm: tap the visit type", p2.map((p) => () => tap(p, "vt:NEW")), 200));
+results.push(await run("L2 storm: confirm the booking", p2.map((p) => () => tap(p, "bk:yes")), 200));
 const appts = await (await fetch(`${BASE}/api/appointments?from=2026-10-10&to=2026-10-10`, { headers: { cookie } })).json() as { time: string }[];
 const at610 = appts.filter((a) => a.time === "6:10 PM").length;
 notes.push(`L2 integrity: ${appts.length} bookings on Sat; bookings at 6:10 PM = **${at610}** (must be ≤ 1). Slots are ${appts.length <= 13 ? "within" : "OVER"} the session capacity.`);

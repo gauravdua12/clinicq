@@ -123,6 +123,7 @@ describe("WhatsApp Flow data endpoint", () => {
     await h.flow(PATIENT, { slot: "2026-10-10|1090", flow_token: token });
     expect((await h.kinds(PATIENT)).at(-1)).toBe("ASK_VISIT_TYPE");
     await h.tap(PATIENT, "vt:NEW");
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     expect((await h.kinds(PATIENT)).at(-1)).toBe("BOOKING_CONFIRMED");
     expect(await h.db.appointment.count({ where: { status: "BOOKED" } })).toBe(1);
   });
@@ -135,6 +136,7 @@ describe("privacy", () => {
     await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
     await h.say(PATIENT, "book tomorrow 6:10 pm for me");
     await h.tap(PATIENT, "vt:NEW");
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     await h.say(PATIENT, "delete my data");
     await h.tap(PATIENT, "erase:yes");
     expect(await h.db.patientAccount.count()).toBe(0);
@@ -161,6 +163,7 @@ describe("privacy", () => {
     await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
     await h.say(PATIENT, "book tomorrow 6:10 pm for me");
     await h.tap(PATIENT, "vt:NEW");
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     h.clock.set("2027-04-20T12:00:00+05:30"); // ~6.4 months later
     let r = await purge(h.ctx);
     expect(r.visits).toBe(1);
@@ -177,6 +180,7 @@ describe("privacy", () => {
     await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
     await h.say(PATIENT, "book Monday 10:20 am for me");
     await h.tap(PATIENT, "vt:NEW");
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     await h.say(PATIENT, "stop sending messages");
     expect((await h.kinds(PATIENT)).at(-1)).toBe("OPTED_OUT");
     await h.at("2026-10-11T10:20:00+05:30");
@@ -277,6 +281,7 @@ describe("demo presenter: doctor and patient on one phone", () => {
 describe("phone-test feedback (11 Oct 2026)", () => {
   it("#1 list fallback: a day with more than 10 free slots asks Morning/Evening first, then lists that session in full", async () => {
     h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    Object.assign(h.ctx.env, { BOOKING_PAGE: false }); // the list is the fallback when the booking page can't be used
     await onboard(h);
     await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
     await h.say(PATIENT, "book monday for me"); // a full day: 9 morning + 9 evening free slots
@@ -291,13 +296,14 @@ describe("phone-test feedback (11 Oct 2026)", () => {
     const rows = list?.kind === "list" ? list.sections.flatMap((s) => s.rows) : [];
     expect(rows.length).toBeGreaterThan(1);
     expect(rows.every((r) => / PM$/.test(r.title))).toBe(true);
+    Object.assign(h.ctx.env, { BOOKING_PAGE: true });
   });
 
   it("#2 booking form opens as soon as the patient wants to book (draft mode until Meta publishes it)", async () => {
     h = await harness({ start: "2026-10-09T12:00:00+05:30" });
     const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048, publicKeyEncoding: { type: "spki", format: "pem" }, privateKeyEncoding: { type: "pkcs8", format: "pem" } });
     h.ctx.flowKey = createPrivateKeyForTest(privateKey);
-    Object.assign(h.ctx.env, { WA_FLOW_ID_BOOKING: "1459463439439703", WA_FLOW_MODE: "draft" });
+    Object.assign(h.ctx.env, { WA_FLOW_ID_BOOKING: "1459463439439703", WA_FLOW_MODE: "draft", BOOKING_PAGE: false }); // native WhatsApp form
     await onboard(h);
     await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
     await h.say(PATIENT, "I want to book an appointment for me");
@@ -306,7 +312,7 @@ describe("phone-test feedback (11 Oct 2026)", () => {
     expect(f?.kind === "flow" && f.draft).toBe(true);
     const { toCloudPayload } = await import("@clinicq/wa");
     expect(JSON.stringify(toCloudPayload(PATIENT, f!))).toContain('"mode":"draft"');
-    Object.assign(h.ctx.env, { WA_FLOW_ID_BOOKING: undefined, WA_FLOW_MODE: "published" });
+    Object.assign(h.ctx.env, { WA_FLOW_ID_BOOKING: undefined, WA_FLOW_MODE: "published", BOOKING_PAGE: true });
   });
 
   it("#3 'sure' after a completed cancellation gets a polite close, not the menu", async () => {
@@ -315,6 +321,7 @@ describe("phone-test feedback (11 Oct 2026)", () => {
     await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
     await h.say(PATIENT, "book tomorrow 6:10 pm for me");
     await h.tap(PATIENT, "vt:NEW");
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     await h.say(PATIENT, "cancel my appointment");
     if ((await h.kinds(PATIENT)).at(-1) !== "CX_DONE") await h.tap(PATIENT, `cx:yes:${(await h.db.appointment.findFirstOrThrow()).id}`);
     expect((await h.kinds(PATIENT)).at(-1)).toBe("CX_DONE");
@@ -333,6 +340,7 @@ describe("phone-test feedback (11 Oct 2026)", () => {
     expect(none?.kind === "buttons" && none.body).toMatch(/^Queue status is visible for your bookings only\./);
     await h.say(PATIENT, "book tomorrow 6:10 pm for me");
     await h.tap(PATIENT, "vt:NEW");
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     await h.tap(PATIENT, "menu:status");
     const fut = h.wa.last(PATIENT);
     expect(fut?.kind === "text" && fut.body).toMatch(/visible for your bookings only.*Sat 10 Oct, 6:10 PM/s);
@@ -347,6 +355,7 @@ describe("phone-test feedback (11 Oct 2026)", () => {
     expect(q?.kind === "buttons" && q.body).toMatch(/test reports reviewed by the doctor/);
     expect(q?.kind === "buttons" && q.buttons.map((b) => b.title)).toEqual(["New consultation", "Follow-up", "Report review"]);
     await h.tap(PATIENT, "vt:REPORT_SHOW");
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     const c = h.wa.last(PATIENT);
     expect(c?.kind === "buttons" && c.body).toMatch(/6:10 PM · Report review/);
   });
@@ -365,5 +374,67 @@ describe("booking form delivery failure", () => {
     const last = h.wa.last(PATIENT);
     expect(["list", "buttons"]).toContain(last?.kind); // list, or Morning/Evening first on a full day
     Object.assign(h.ctx.env, { WA_FLOW_ID_BOOKING: undefined, WA_FLOW_MODE: "published" });
+  });
+});
+
+describe("booking page (form D, opened from WhatsApp)", () => {
+  const start = async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    await onboard(h);
+    await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
+    await h.say(PATIENT, "I want to book an appointment for me");
+    const m = h.wa.last(PATIENT);
+    expect(m?.kind).toBe("cta_url");
+    return (m as { url: string }).url.split("t=")[1]!;
+  };
+
+  it("shows the week and every slot of a day; books only on confirm; link works once", async () => {
+    const token = await start();
+    const info = (await h.app.inject({ url: `/api/book/${token}` })).json();
+    expect(info.name).toBe("Ramesh");
+    expect(info.dates.find((d: { date: string }) => d.date === "2026-10-11").enabled).toBe(false); // Sunday closed
+    const day = (await h.app.inject({ url: `/api/book/${token}/day/2026-10-12` })).json();
+    expect(day.sessions.map((s: { label: string }) => s.label)).toEqual(["Morning", "Evening"]);
+    expect(day.sessions[0].slots.length).toBe(9);
+    expect(await h.db.appointment.count()).toBe(0); // looking books nothing
+    const ok = await h.app.inject({ method: "POST", url: `/api/book/${token}/confirm`, payload: { date: "2026-10-12", min: 1090, visitType: "FOLLOW_UP" } });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toMatchObject({ ok: true, time: "6:10 PM", visitType: "FOLLOW_UP" });
+    const a = await h.db.appointment.findFirstOrThrow({ where: { status: "BOOKED" } });
+    expect(a.visitType).toBe("FOLLOW_UP");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("BOOKING_CONFIRMED"); // confirmation also arrives in WhatsApp
+    expect(h.lastText(PATIENT)).toMatch(/Mon 12 Oct, 6:10 PM · Follow-up/);
+    expect((await h.app.inject({ url: `/api/book/${token}` })).statusCode).toBe(410); // one use
+    expect((await h.db.conversationState.findFirstOrThrow()).state).toBe("IDLE");
+  });
+
+  it("a slot taken meanwhile is refused with fresh slots; bad input and expired links are rejected", async () => {
+    const token = await start();
+    const info = await clinicInfo(h.ctx);
+    const other = await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Aarav", "SON");
+    void other;
+    await h.db.appointment.create({ data: { doctorId: info.doctor.id, sessionId: info.sessions.find((s) => s.weekday === 1 && s.label === "Evening")!.id, slotStart: new Date("2026-10-12T18:10:00+05:30"), slotKey: `${info.doctor.id}:${new Date("2026-10-12T18:10:00+05:30").toISOString()}`, status: "BOOKED", visitType: "NEW", token: "A-9", bookedAt: new Date(), source: "WHATSAPP" } });
+    const taken = await h.app.inject({ method: "POST", url: `/api/book/${token}/confirm`, payload: { date: "2026-10-12", min: 1090, visitType: "NEW" } });
+    expect(taken.statusCode).toBe(409);
+    expect(taken.json().sessions[1].slots.find((s: { min: number }) => s.min === 1090).free).toBe(false); // greyed on the page
+    expect((await h.app.inject({ method: "POST", url: `/api/book/${token}/confirm`, payload: { date: "12-10-2026", min: 1090, visitType: "NEW" } })).statusCode).toBe(400);
+    expect((await h.app.inject({ url: "/api/book/not-a-real-token-at-all-xxxx" })).statusCode).toBe(410);
+    h.clock.advance(31 * 60_000);
+    expect((await h.app.inject({ url: `/api/book/${token}` })).statusCode).toBe(410); // 30-minute link
+  });
+});
+
+describe("sessions with a set number of slots", () => {
+  it("shows exactly the number of slots the doctor sets (50 per session)", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    const login = await h.app.inject({ method: "POST", url: "/api/auth/dev-login", payload: { role: "DOCTOR" } });
+    const sid = login.cookies.find((c) => c.name === "sid")!.value;
+    const body = [{ weekday: 1, label: "Morning", startTime: "10:00", endTime: "13:00", slotMinutes: 3, maxSlots: 50, walkinQuota: 8 }, { weekday: 1, label: "Evening", startTime: "17:00", endTime: "20:00", slotMinutes: 3, maxSlots: 50, walkinQuota: 8 }];
+    expect((await h.app.inject({ method: "PUT", url: "/api/settings/sessions", cookies: { sid }, payload: body })).statusCode).toBe(200);
+    const avail = await windowAvailability(h.ctx, await clinicInfo(h.ctx));
+    const mon = S.freeSlotsOn("2026-10-12", avail);
+    expect(mon.filter((s) => s.sessionLabel === "Morning").length).toBe(50);
+    expect(mon.filter((s) => s.sessionLabel === "Evening").length).toBe(50);
+    expect(mon.filter((s) => s.sessionLabel === "Morning").at(-1)!.startMin).toBe(10 * 60 + 49 * 3); // 12:27, not 12:57
   });
 });

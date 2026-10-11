@@ -62,6 +62,7 @@ function Render({ msg, onTap }: { msg: Msg; onTap: (id: string, title: string) =
   if (msg.kind === "text") return <>{msg.body}</>;
   if (msg.kind === "contact") return <>📇 {msg.name} · {msg.phone}</>;
   if (msg.kind === "template") return <><span className="pill">template</span> {msg.name}<br />{msg.bodyParams.join(" · ")}{msg.quickReplyPayloads?.map((p) => <button key={p} className="small" style={{ display: "block", width: "100%", marginTop: 4 }} onClick={() => onTap(p, p.split(":")[1] ?? p)}>{p.split(":")[1]}</button>)}</>;
+  if (msg.kind === "cta_url") return <>{msg.body}<a className="btn small" style={{ display: "block", textAlign: "center", marginTop: 6 }} href={msg.url} target="_blank" rel="noopener">↗ {msg.displayText}</a></>;
   if (msg.kind === "flow") return <>{msg.body}<button className="small" style={{ display: "block", width: "100%", marginTop: 6 }} disabled>{msg.cta} (Flow)</button></>;
   const btns = msg.kind === "buttons" ? msg.buttons : msg.sections.flatMap((s) => s.rows.map((r) => ({ id: r.id, title: `${s.title}: ${r.title}` })));
   return <>{msg.body}{btns.map((b) => <button key={b.id} className="small" style={{ display: "block", width: "100%", marginTop: 4 }} onClick={() => onTap(b.id, b.title)}>{b.title}</button>)}</>;

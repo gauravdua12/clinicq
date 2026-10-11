@@ -34,6 +34,7 @@ describe("S2 returning patient + reminder + reschedule", () => {
     await h.say(PATIENT, "10:20");
     expect(await last(h, PATIENT)).toBe("ASK_VISIT_TYPE");
     await h.tap(PATIENT, "vt:FOLLOW_UP");
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     expect(await last(h, PATIENT)).toBe("BOOKING_CONFIRMED");
     const appt = await h.db.appointment.findFirstOrThrow({ where: { status: "BOOKED" } });
     expect(appt.token).toBe("A-2");
@@ -189,6 +190,7 @@ describe("S6 slot race and family same slot", () => {
     await createProfile(h.ctx, await accountId(h, PATIENT2), "Vikas Jain", "SELF");
     await h.say(PATIENT2, "book tomorrow 6:10 pm for me");
     await h.tap(PATIENT2, "vt:NEW");
+    await h.tap(PATIENT2, "bk:yes"); // final confirmation
     expect(await last(h, PATIENT2)).toBe("BOOKING_CONFIRMED");
 
     await h.tap(PATIENT, six10);
@@ -203,6 +205,7 @@ describe("S6 slot race and family same slot", () => {
     // Ramesh books 6:30 for himself, then asks for his son at the same time.
     await h.say(PATIENT, "book tomorrow 6:30 pm for me");
     await h.tap(PATIENT, "vt:NEW");
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     expect(await last(h, PATIENT)).toBe("BOOKING_CONFIRMED");
     await h.say(PATIENT, "also book for my son Aarav tomorrow at 6:30 PM");
     expect(await last(h, PATIENT)).toBe("SAME_SLOT_FAMILY");
@@ -210,6 +213,7 @@ describe("S6 slot race and family same slot", () => {
     expect(h.buttons(PATIENT)[0]!.title).toBe("Book 6:50 PM");
     await h.tap(PATIENT, h.buttons(PATIENT)[0]!.id);
     await h.tap(PATIENT, "vt:NEW");
+    await h.tap(PATIENT, "bk:yes"); // final confirmation
     expect(await last(h, PATIENT)).toBe("BOOKING_CONFIRMED");
     expect(h.lastText(PATIENT)).toContain("Aarav ji");
     expect(await h.db.appointment.count({ where: { status: "BOOKED" } })).toBe(3);

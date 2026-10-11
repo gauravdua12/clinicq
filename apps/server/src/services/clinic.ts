@@ -35,7 +35,7 @@ export async function clinicInfo(ctx: Ctx): Promise<ClinicInfo> {
 }
 
 export function sessionDefs(sessions: Session[]): S.SessionDef[] {
-  return sessions.map((s) => ({ id: s.id, weekday: s.weekday, label: s.label, startTime: s.startTime, endTime: s.endTime, slotMinutes: s.slotMinutes, walkinQuota: s.walkinQuota, active: s.active }));
+  return sessions.map((s) => ({ id: s.id, weekday: s.weekday, label: s.label, startTime: s.startTime, endTime: s.endTime, slotMinutes: s.slotMinutes, maxSlots: s.maxSlots, walkinQuota: s.walkinQuota, active: s.active }));
 }
 
 export function nowLocal(ctx: Ctx): { date: string; min: number; time: string } {

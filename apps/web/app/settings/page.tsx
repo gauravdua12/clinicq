@@ -66,34 +66,55 @@ function ClinicTab() {
   );
 }
 
-interface Sess { weekday: number; label: string; startTime: string; endTime: string; slotMinutes: number; walkinQuota: number; active?: boolean }
+interface Sess { weekday: number; label: string; startTime: string; endTime: string; slotMinutes: number; maxSlots?: number | null; walkinQuota: number; active?: boolean }
+
+const mins = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return (h ?? 0) * 60 + (m ?? 0); };
+const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+/** Slots a session shows patients: as many slot lengths as fit, or exactly the number set. */
+const slotCount = (r: Sess) => { const fit = Math.max(0, Math.floor((mins(r.endTime) - mins(r.startTime)) / Math.max(1, r.slotMinutes))); return r.maxSlots ? Math.min(r.maxSlots, fit) : fit; };
 
 function SessionsTab() {
   const [rows, setRows] = useState<Sess[]>([]);
   const s = useSaved();
   useEffect(() => { api<Sess[]>("/api/settings/sessions").then((r) => setRows(r.filter((x) => x.active !== false))); }, []);
-  const upd = (i: number, k: keyof Sess, v: string | number) => { setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r))); s.clear(); };
+  const upd = (i: number, k: keyof Sess, v: string | number) => {
+    setRows(rows.map((r, j) => {
+      if (j !== i) return r;
+      const next = { ...r, [k]: v } as Sess;
+      if (k === "slotMinutes") next.maxSlots = null; // slot length set directly: show every slot that fits
+      if (k === "startTime" || k === "endTime") { if (next.maxSlots) next.slotMinutes = Math.max(1, Math.floor((mins(next.endTime) - mins(next.startTime)) / next.maxSlots)); }
+      return next;
+    }));
+    s.clear();
+  };
+  // "Slots" typed: the slot length follows from the hours, and exactly that many slots are shown.
+  const setSlots = (i: number, n: number) => {
+    setRows(rows.map((r, j) => (j === i ? { ...r, maxSlots: n > 0 ? n : null, slotMinutes: n > 0 ? Math.max(1, Math.floor((mins(r.endTime) - mins(r.startTime)) / n)) : r.slotMinutes } : r)));
+    s.clear();
+  };
   return (
     <div className="card">
-      <p className="small muted">Each row is one weekly session. Slots are generated from the start time in steps of the slot length.</p>
-      <table>
-        <thead><tr><th>Day</th><th>Label</th><th>Start</th><th>End</th><th>Slot (min)</th><th>Walk-in quota</th><th /></tr></thead>
+      <p className="small muted">Each row is one weekly session. Set the hours, then either the <b>number of slots</b> you want patients to see (the slot length is worked out for you) or the <b>slot length</b>.</p>
+      <div className="table-scroll"><table className="sess-table">
+        <thead><tr><th>Day</th><th>Label</th><th>Start</th><th>End</th><th>Slots</th><th>Slot (min)</th><th>Walk-in quota</th><th /></tr></thead>
         <tbody>{rows.map((r, i) => (
           <tr key={i}>
             <td><select value={r.weekday} onChange={(e) => upd(i, "weekday", Number(e.target.value))}>{WD.map((w, k) => <option key={k} value={k}>{w}</option>)}</select></td>
             <td><input value={r.label} onChange={(e) => upd(i, "label", e.target.value)} /></td>
             <td><input type="time" value={r.startTime} onChange={(e) => upd(i, "startTime", e.target.value)} /></td>
             <td><input type="time" value={r.endTime} onChange={(e) => upd(i, "endTime", e.target.value)} /></td>
-            <td><input type="number" value={r.slotMinutes} onChange={(e) => upd(i, "slotMinutes", Number(e.target.value))} /></td>
+            <td><input type="number" min={1} max={300} aria-label="Number of slots" value={slotCount(r)} onChange={(e) => setSlots(i, Number(e.target.value))} />
+              <div className="small muted nowrap">{slotCount(r) ? `ends ${hhmm(mins(r.startTime) + slotCount(r) * r.slotMinutes)}` : "no slots"}</div></td>
+            <td><input type="number" min={1} max={120} aria-label="Slot length in minutes" value={r.slotMinutes} onChange={(e) => upd(i, "slotMinutes", Number(e.target.value))} /></td>
             <td><input type="number" value={r.walkinQuota} onChange={(e) => upd(i, "walkinQuota", Number(e.target.value))} /></td>
             <td><button className="ghost warn" onClick={() => setRows(rows.filter((_, j) => j !== i))}>Remove</button></td>
           </tr>
         ))}</tbody>
-      </table>
+      </table></div>
       <div className="row" style={{ marginTop: 10 }}>
         <button onClick={() => setRows([...rows, { weekday: 1, label: "Morning", startTime: "10:00", endTime: "13:00", slotMinutes: 15, walkinQuota: 10 }])}>+ Add session</button>
         <button className="primary" onClick={async () => {
-          try { await api("/api/settings/sessions", { method: "PUT", body: rows.map(({ weekday, label, startTime, endTime, slotMinutes, walkinQuota }) => ({ weekday, label, startTime, endTime, slotMinutes, walkinQuota })) }); s.ok(); }
+          try { await api("/api/settings/sessions", { method: "PUT", body: rows.map(({ weekday, label, startTime, endTime, slotMinutes, maxSlots, walkinQuota }) => ({ weekday, label, startTime, endTime, slotMinutes, maxSlots: maxSlots ?? null, walkinQuota })) }); s.ok(); }
           catch (e) { s.err(e instanceof ApiError && e.code === "overlap" ? "Two sessions on the same day overlap." : e instanceof ApiError && e.code === "end_before_start" ? "End time must be after start time." : "Couldn't save."); }
         }}>Save sessions</button>
       </div>

@@ -11,6 +11,7 @@ export type OutMsg =
   | { kind: "list"; body: string; button: string; sections: ListSection[] }
   | { kind: "flow"; body: string; cta: string; flowId: string; flowToken: string; screen: string; data?: Record<string, unknown>; draft?: boolean }
   | { kind: "contact"; name: string; phone: string }
+  | { kind: "cta_url"; body: string; displayText: string; url: string }
   | { kind: "template"; name: string; lang: string; bodyParams: string[]; quickReplyPayloads?: string[]; otpCode?: string };
 
 export class MessageLimitError extends Error {}
@@ -46,6 +47,11 @@ export function validate(m: OutMsg): void {
       }
       break;
     }
+    case "cta_url":
+      if (len(m.displayText) > 20) fail("cta_url display text > 20");
+      if (len(m.body) > 1024) fail("cta_url body > 1024");
+      if (!/^https?:\/\//.test(m.url)) fail("cta_url url");
+      break;
     case "flow":
       if (len(m.cta) > 20) fail("flow cta > 20");
       if (len(m.body) > 1024) fail("flow body > 1024");
@@ -86,6 +92,8 @@ export function toCloudPayload(to: string, m: OutMsg): Record<string, unknown> {
           },
         },
       };
+    case "cta_url":
+      return { ...base, type: "interactive", interactive: { type: "cta_url", body: { text: m.body }, action: { name: "cta_url", parameters: { display_text: m.displayText, url: m.url } } } };
     case "contact":
       return { ...base, type: "contacts", contacts: [{ name: { formatted_name: m.name, first_name: m.name }, phones: [{ phone: m.phone, type: "WORK" }] }] };
     case "template":
@@ -111,6 +119,7 @@ export function previewText(m: OutMsg): string {
     case "buttons": return `${m.body}\n${m.buttons.map((b) => `[${b.title}]`).join(" ")}`;
     case "list": return `${m.body}\n[${m.button}] ${m.sections.flatMap((s) => s.rows.map((r) => r.title)).join(", ")}`;
     case "flow": return `${m.body}\n[${m.cta}]`;
+    case "cta_url": return `${m.body}\n[${m.displayText}] ${m.url}`;
     case "contact": return `Contact: ${m.name} ${m.phone}`;
     case "template": return `template:${m.name}(${m.bodyParams.join(" | ")})`;
   }

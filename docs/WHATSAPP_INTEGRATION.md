@@ -102,3 +102,13 @@ Use the list picker if: the Flow send fails (API error), the patient types "can'
 - `WA_MODE=mock`: `MockWhatsApp` implements the same interface as `CloudApiClient` and stores outbound messages in memory. It emits them on an SSE channel for the simulator.
 - `/dev/simulator` (built only when dev tools are enabled): a phone-like chat UI. Pick a fake patient number and name, type or tap buttons, "send voice note" (a text box that feeds the mock STT), "send image". It posts signed webhook payloads to `/webhook` exactly like Meta, so the real code path is exercised. A second panel shows the staff phone (for overflow and commands).
 - Flow simulation: the simulator renders the Flow screens from the same Flow JSON and calls `/flow` with real encryption, using a dev key pair.
+
+## Booking page (form D), added 11 Oct 2026
+WhatsApp's native Flows cap selectors at about 20 options and can't scroll sideways, and Meta blocks unpublished Flows until business verification. So form D is a **page opened from a `cta_url` button** (an interactive message, allowed in the 24 h window, no template needed): `https://<host>/book?t=<token>`.
+- **Token:** a `FlowToken` row. It names the account and profile, lasts 30 minutes, and works for one booking. The page shows only the patient's first name.
+- **API:**
+  - `GET /api/book/:t` loads the clinic, the week and the visit types.
+  - `GET /api/book/:t/day/:date` loads every slot of the day, with booked ones flagged.
+  - `POST /api/book/:t/confirm` books through the same path as the chat (`bookFromPage`, serialised with the patient's messages). It sends the WhatsApp confirmation, or returns 409 with fresh slots if the slot was taken meanwhile.
+- **If the button can't be delivered** to a patient, that chat falls back to the list picker (C) for an hour.
+- **The native Flow** is still supported: set `BOOKING_PAGE=false` with `WA_FLOW_ID_BOOKING`.

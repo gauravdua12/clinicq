@@ -354,6 +354,16 @@ export const COPY = {
     hi: "रिसेप्शन अभी व्यस्त है, इंतज़ार के लिए माफ़ी। अगले उपलब्ध अपॉइंटमेंट समय:",
     hinglish: "Reception abhi busy hai, wait ke liye sorry. Agle available appointment time:",
   },
+  CONFIRM_BOOKING_ASK: {
+    en: "Please confirm the booking:\n\n*{{name}} ji*\n{{dayShort}}, {{time}}\nVisit: {{visit}}\n📍 {{clinicName}}",
+    hi: "कृपया बुकिंग कन्फ़र्म करें:\n\n*{{name}} जी*\n{{dayShort}}, {{time}}\nविज़िट: {{visit}}\n📍 {{clinicName}}",
+    hinglish: "Please booking confirm karein:\n\n*{{name}} ji*\n{{dayShort}}, {{time}}\nVisit: {{visit}}\n📍 {{clinicName}}",
+  },
+  BOOK_LINK_BODY: {
+    en: "Tap the button to see all free times for {{name}} ji and pick one. You'll confirm before anything is booked.\nYou can also just type it, like \"tomorrow 6 pm\".",
+    hi: "{{name}} जी के लिए सभी ख़ाली समय देखने और चुनने के लिए बटन दबाएँ। बुकिंग से पहले आप कन्फ़र्म करेंगे।\nचाहें तो लिख भी सकते हैं, जैसे \"कल शाम 6 बजे\"।",
+    hinglish: "{{name}} ji ke liye saare khaali time dekhne aur chunne ke liye button dabaiye. Booking se pehle aap confirm karenge.\nChahein to likh bhi sakte hain, jaise \"kal shaam 6 baje\".",
+  },
   STALE_MESSAGE: {
     en: "Sorry, we couldn't reply to your earlier message 🙏 Please send your request again and I'll help right away.",
     hi: "माफ़ कीजिए, हम आपके पिछले संदेश का जवाब नहीं दे पाए 🙏 कृपया अपना अनुरोध दोबारा भेजें, मैं तुरंत मदद करूँगा।",
@@ -537,6 +547,8 @@ export const BTN = {
   RESCHEDULE: { en: "Reschedule", hi: "री-शेड्यूल", hinglish: "Reschedule" },
   CANCEL: { en: "Cancel", hi: "कैंसल", hinglish: "Cancel" },
   CONFIRM: { en: "Confirm", hi: "कन्फ़र्म", hinglish: "Confirm" },
+  CONFIRM_BOOKING: { en: "Confirm booking", hi: "कन्फ़र्म करें", hinglish: "Confirm karein" },
+  CHANGE_TIME: { en: "Change time", hi: "समय बदलें", hinglish: "Time badlein" },
   YES_CANCEL: { en: "Yes, cancel", hi: "हाँ, कैंसल करें", hinglish: "Haan, cancel karo" },
   KEEP_IT: { en: "Keep it", hi: "रहने दें", hinglish: "Rehne do" },
   TRY_ANOTHER_DAY: { en: "Try another day", hi: "दूसरा दिन", hinglish: "Doosra din" },

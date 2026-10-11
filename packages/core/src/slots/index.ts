@@ -9,6 +9,8 @@ export interface SessionDef {
   startTime: string; // "17:10"
   endTime: string; // "20:00"
   slotMinutes: number;
+  /** Optional cap: show exactly this many slots (from the start time), even if the session could fit more. */
+  maxSlots?: number | null;
   walkinQuota: number;
   active?: boolean;
 }
@@ -58,7 +60,8 @@ export function generateSlots(date: string, s: SessionDef): Slot[] {
   const out: Slot[] = [];
   const start = toMin(s.startTime);
   const end = toMin(s.endTime);
-  for (let m = start, i = 0; m + s.slotMinutes <= end; m += s.slotMinutes, i++) {
+  const cap = s.maxSlots && s.maxSlots > 0 ? s.maxSlots : Infinity;
+  for (let m = start, i = 0; m + s.slotMinutes <= end && i < cap; m += s.slotMinutes, i++) {
     out.push({ date, sessionId: s.id, sessionLabel: s.label, startMin: m, endMin: m + s.slotMinutes, index: i });
   }
   return out;
