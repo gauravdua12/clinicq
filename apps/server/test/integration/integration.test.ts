@@ -351,3 +351,19 @@ describe("phone-test feedback (11 Oct 2026)", () => {
     expect(c?.kind === "buttons" && c.body).toMatch(/6:10 PM · Report review/);
   });
 });
+
+describe("booking form delivery failure", () => {
+  it("falls back to the slot list if Meta won't deliver the form", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048, publicKeyEncoding: { type: "spki", format: "pem" }, privateKeyEncoding: { type: "pkcs8", format: "pem" } });
+    h.ctx.flowKey = createPrivateKeyForTest(privateKey);
+    Object.assign(h.ctx.env, { WA_FLOW_ID_BOOKING: "1459463439439703", WA_FLOW_MODE: "draft" });
+    await onboard(h);
+    await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
+    h.wa.failNext = 1; // the form message is refused
+    await h.say(PATIENT, "I want to book an appointment for me");
+    const last = h.wa.last(PATIENT);
+    expect(["list", "buttons"]).toContain(last?.kind); // list, or Morning/Evening first on a full day
+    Object.assign(h.ctx.env, { WA_FLOW_ID_BOOKING: undefined, WA_FLOW_MODE: "published" });
+  });
+});

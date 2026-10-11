@@ -81,13 +81,13 @@ class Turn {
     if (!name) return "";
     return this.lang === "hi" ? `, ${name} जी` : `, ${name} ji`;
   }
-  async send(msg: OutMsg, kind: string): Promise<void> {
+  async send(msg: OutMsg, kind: string): Promise<boolean> {
     this.conv.lastOut = kind;
-    await sendTo(this.ctx, this.waId, msg, { kind, accountId: this.acc.id });
+    return sendTo(this.ctx, this.waId, msg, { kind, accountId: this.acc.id });
   }
   async text(id: C.CopyId, vars: C.Vars = {}): Promise<void> { await this.send({ kind: "text", body: this.t(id, vars) }, id); }
   async buttons(body: string, kind: string, buttons: Button[]): Promise<void> {
-    if (!buttons.length) return this.send({ kind: "text", body }, kind);
+    if (!buttons.length) { await this.send({ kind: "text", body }, kind); return; }
     await this.send({ kind: "buttons", body, buttons: buttons.slice(0, 3) }, kind);
   }
   set(state: State): void { this.conv.state = state; }
@@ -641,8 +641,11 @@ async function offer(t: Turn): Promise<void> {
   return slotPicker(t, r.hasAny ? date : (S.firstDateWithFree(date, avail) ?? date), true);
 }
 
+/** Set when Meta refuses to deliver the booking form (e.g. draft form to a non-tester): use the list for a while. */
+let flowFailedAt = 0;
+
 function flowReady(t: Turn): boolean {
-  return !!(t.info.settings.flowsEnabled && t.ctx.env.WA_FLOW_ID_BOOKING && t.ctx.flowKey);
+  return !!(t.info.settings.flowsEnabled && t.ctx.env.WA_FLOW_ID_BOOKING && t.ctx.flowKey) && t.ctx.clock.now().getTime() - flowFailedAt > 3600_000;
 }
 
 /** Form D: the WhatsApp booking form (date chips, Morning / Evening slot chips). */
@@ -651,7 +654,11 @@ async function openFlow(t: Turn): Promise<void> {
   const token = randomBytes(24).toString("base64url");
   await t.ctx.db.flowToken.create({ data: { token, accountId: t.acc.id, profileId: t.conv.p.profileId ?? null, expiresAt: new Date(t.ctx.clock.now().getTime() + 15 * 60_000) } });
   t.set("BK_FLOW_OPEN");
-  return t.send({ kind: "flow", body: t.t("FLOW_BODY", { name }), cta: t.b("CHOOSE_DATE_TIME"), flowId: t.ctx.env.WA_FLOW_ID_BOOKING!, flowToken: token, screen: "PICK_DATE_SLOT", draft: t.ctx.env.WA_FLOW_MODE === "draft" }, "FLOW_BOOKING");
+  const sent = await t.send({ kind: "flow", body: t.t("FLOW_BODY", { name }), cta: t.b("CHOOSE_DATE_TIME"), flowId: t.ctx.env.WA_FLOW_ID_BOOKING!, flowToken: token, screen: "PICK_DATE_SLOT", draft: t.ctx.env.WA_FLOW_MODE === "draft" }, "FLOW_BOOKING");
+  if (sent) return;
+  flowFailedAt = t.ctx.clock.now().getTime();
+  t.ctx.log.warn({}, "flow_send_failed_using_list");
+  return slotPicker(t, t.conv.requested?.date ?? nowLocal(t.ctx).date);
 }
 
 /** Form D when available, else the list picker (form C): one day, split by session when it wouldn't fit in 10 rows. */
@@ -686,7 +693,7 @@ async function slotPicker(t: Turn, fromDate: string, introSent = false, session?
   if (!offered.length) return callClinic(t);
   t.conv.offered = offered;
   t.set("BK_PICK_SLOT");
-  return t.send({ kind: "list", body: t.t("LIST_PICKER", { name }), button: t.b("VIEW_SLOTS"), sections }, "LIST_PICKER");
+  { await t.send({ kind: "list", body: t.t("LIST_PICKER", { name }), button: t.b("VIEW_SLOTS"), sections }, "LIST_PICKER"); return; }
 }
 
 async function answerPick(t: Turn, e: Extraction): Promise<void> {
@@ -836,7 +843,7 @@ async function startReschedule(t: Turn, e: Extraction | null): Promise<void> {
   if (!up.length) { t.set("IDLE"); return t.buttons(t.t("NO_UPCOMING"), "NO_UPCOMING", [{ id: "menu:book", title: t.b("BOOK") }]); }
   if (up.length === 1) return beginReschedule(t, up[0]!.id, e);
   t.set("RS_PICK_APPT");
-  return t.send({ kind: "list", body: t.t("RS_PICK_APPT"), button: t.b("MY_APPTS"), sections: [{ title: "Appointments", rows: up.slice(0, 10).map((u) => ({ id: `rs:${u.id}`, title: fmtAppt(t, u).slice(0, 24) })) }] }, "RS_PICK_APPT");
+  { await t.send({ kind: "list", body: t.t("RS_PICK_APPT"), button: t.b("MY_APPTS"), sections: [{ title: "Appointments", rows: up.slice(0, 10).map((u) => ({ id: `rs:${u.id}`, title: fmtAppt(t, u).slice(0, 24) })) }] }, "RS_PICK_APPT"); return; }
 }
 
 async function beginReschedule(t: Turn, apptId: string, e: Extraction | null): Promise<void> {
@@ -861,7 +868,7 @@ async function startCancel(t: Turn, e: Extraction | null): Promise<void> {
   if (!up.length) { t.set("IDLE"); return t.buttons(t.t("NO_UPCOMING"), "NO_UPCOMING", [{ id: "menu:book", title: t.b("BOOK") }]); }
   if (up.length === 1) return askCancelConfirm(t, up[0]!.id);
   t.set("CX_PICK_APPT");
-  return t.send({ kind: "list", body: t.t("CX_PICK_APPT"), button: t.b("MY_APPTS"), sections: [{ title: "Appointments", rows: up.slice(0, 10).map((u) => ({ id: `cxp:${u.id}`, title: fmtAppt(t, u).slice(0, 24) })) }] }, "CX_PICK_APPT");
+  { await t.send({ kind: "list", body: t.t("CX_PICK_APPT"), button: t.b("MY_APPTS"), sections: [{ title: "Appointments", rows: up.slice(0, 10).map((u) => ({ id: `cxp:${u.id}`, title: fmtAppt(t, u).slice(0, 24) })) }] }, "CX_PICK_APPT"); return; }
 }
 
 async function askCancelConfirm(t: Turn, apptId: string): Promise<void> {
