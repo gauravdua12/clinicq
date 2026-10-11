@@ -31,8 +31,11 @@ const account = () => db.patientAccount.findUnique({ where: { phoneHash: phoneHa
 const state = async () => { const a = await account(); return a ? (await db.conversationState.findUnique({ where: { accountId: a.id } }))?.state ?? "IDLE" : "NONE"; };
 const booked = async () => { const a = await account(); return a ? db.appointment.findMany({ where: { status: "BOOKED", profile: { accountId: a.id } } }) : []; };
 
-// Tomorrow in IST, 6:10 PM (an exact evening slot in the demo clinic).
+// Tomorrow in IST at CHECK_SLOT (default 18:10, an exact slot in the demo clinic); parallel runs use different slots.
 const tomorrow = new Date(Date.now() + 5.5 * 3600_000 + 86400_000).toISOString().slice(0, 10);
+const [hh, mm] = (process.env.CHECK_SLOT ?? "18:10").split(":").map(Number) as [number, number];
+const slotMin = hh * 60 + mm;
+const spoken = `${hh < 12 ? "subah" : "shaam"} ${hh > 12 ? hh - 12 : hh}:${String(mm).padStart(2, "0")} baje`;
 
 try {
   // 1. Health and webhook security
@@ -44,7 +47,7 @@ try {
   check("dev tools are off in production", (await fetch(`${BASE}/dev/clock`, { method: "POST" })).status === 404);
 
   // 2. A full booking through the live AI, answering whatever the bot asks next
-  const first = "kal shaam 6:10 baje mummy ke liye appointment chahiye, unka naam Sunita hai";
+  const first = `kal ${spoken} mummy ke liye appointment chahiye, unka naam Sunita hai`;
   check("first message accepted", (await say(first)) === 200);
   const seen: string[] = [];
   for (let i = 0; i < 10 && !(await booked()).length; i++) {
@@ -54,16 +57,17 @@ try {
     else if (s === "AWAIT_NUMBER_CONFIRM") await tap("num:use");
     else if (s === "BK_WHO") await tap("who:other");
     else if (s === "BK_NAME") await say("Sunita");
-    else if (s === "BK_WHEN" || s === "IDLE") await say("kal shaam 6:10 baje mummy ke liye");
-    else if (s === "BK_PICK_SLOT") await tap(`slot:${tomorrow}|${18 * 60 + 10}`);
+    else if (s === "BK_WHEN" || s === "IDLE") await say(`kal ${spoken} mummy ke liye`);
+    else if (s === "BK_PICK_SLOT") await tap(`slot:${tomorrow}|${slotMin}`);
     else if (s === "BK_VISIT_TYPE") await tap("vt:NEW");
     else if (s === "BK_SAME_FAMILY") await tap("who:other");
     else break;
   }
   const appts = await booked();
   check("booking completed through the live conversation", appts.length === 1, `states: ${seen.join(" → ")}`);
-  const slotOk = appts[0] && new Date(appts[0].slotStart.getTime() + 5.5 * 3600_000).toISOString().slice(0, 16) === `${tomorrow}T18:10`;
-  check("booked the requested slot (tomorrow 6:10 PM)", !!slotOk, appts[0]?.slotStart.toISOString());
+  const want = `${tomorrow}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+  const slotOk = appts[0] && new Date(appts[0].slotStart.getTime() + 5.5 * 3600_000).toISOString().slice(0, 16) === want;
+  check(`booked the requested slot (${want} IST)`, !!slotOk, appts[0]?.slotStart.toISOString());
   const prof = appts[0]?.profileId ? await db.patientProfile.findUnique({ where: { id: appts[0].profileId } }) : null;
   const name = prof?.name ? decrypt(prof.name) : "";
   check("patient name understood as Sunita (stored encrypted)", /sunita/i.test(name) && !/sunita/i.test(prof?.name ?? ""), name || "none");
