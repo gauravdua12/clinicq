@@ -289,7 +289,8 @@ describe("phone-test feedback (11 Oct 2026)", () => {
     const ask = h.wa.last(PATIENT);
     expect(ask?.kind).toBe("buttons");
     const evening = ask?.kind === "buttons" ? ask.buttons.find((b) => b.title.startsWith("Evening"))! : null;
-    expect(evening?.title).toMatch(/^Evening \(\d+\)$/);
+    expect(evening?.title).toBe("Evening (5:10–8pm)"); // session hours beside the name
+    expect(ask?.kind === "buttons" && ask.buttons[0]!.title).toBe("Morning (10am–1pm)");
     await h.tap(PATIENT, evening!.id);
     const list = h.wa.last(PATIENT);
     expect(list?.kind).toBe("list");
@@ -562,5 +563,30 @@ describe("coming back to an unfinished chat", () => {
     expect(m?.kind === "buttons" && m.buttons.map((b) => b.title)).toEqual(["Show free times", "Stop booking"]);
     await h.tap(PATIENT, "bk:stop");
     expect((await h.kinds(PATIENT)).at(-1)).toBe("BOOKING_STOPPED");
+  });
+});
+
+describe("language choice", () => {
+  it("menu offers Change language; the choice sticks until changed; typed requests work", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    await onboard(h);
+    await h.say(PATIENT, "Hi");
+    const m = h.wa.last(PATIENT);
+    expect(m?.kind).toBe("list"); // WhatsApp allows 3 buttons; the menu needs 4 options
+    expect(h.buttons(PATIENT).map((b) => b.title)).toEqual(["Book appointment", "My appointments", "Queue status", "Change language"]);
+    await h.tap(PATIENT, "menu:lang");
+    expect(h.buttons(PATIENT).map((b) => b.title)).toEqual(["English", "हिंदी", "Hinglish"]);
+    await h.tap(PATIENT, "lang:hi");
+    const kinds = await h.kinds(PATIENT);
+    expect(kinds.slice(-2)).toEqual(["LANGUAGE_SET", "MAIN_MENU"]);
+    expect(h.wa.to(PATIENT).at(-2)?.kind === "text" && (h.wa.to(PATIENT).at(-2) as { body: string }).body).toMatch(/हिंदी में/);
+    await h.say(PATIENT, "what are the clinic timings"); // typed in English, reply stays Hindi
+    expect(h.lastText(PATIENT)).toMatch(/[ऀ-ॿ]/);
+    await h.say(PATIENT, "English please");
+    expect((await h.kinds(PATIENT)).slice(-2)).toEqual(["LANGUAGE_SET", "MAIN_MENU"]);
+    await h.say(PATIENT, "clinic kahan hai");
+    expect(h.lastText(PATIENT)).not.toMatch(/[ऀ-ॿ]/);
+    await h.say(PATIENT, "change language");
+    expect(h.buttons(PATIENT).map((b) => b.title)).toEqual(["English", "हिंदी", "Hinglish"]);
   });
 });

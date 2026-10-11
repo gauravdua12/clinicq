@@ -37,6 +37,18 @@ function columns(slots: Slot[]): { hour: string | null; slots: Slot[] }[] {
   return out;
 }
 
+/**
+ * Straight back into the WhatsApp chat. The app link opens WhatsApp directly; a plain wa.me link makes iOS show a
+ * chooser (Messages / WhatsApp Business) on phones with more than one app. If WhatsApp doesn't open, fall back.
+ */
+function BackToWhatsApp({ number, label }: { number: string; label: string }) {
+  const app = `whatsapp://send?phone=${number}`;
+  const web = `https://wa.me/${number}`;
+  return (
+    <a className="bk-cta" href={app} onClick={() => { setTimeout(() => { if (!document.hidden) window.location.href = web; }, 1500); }}>{label}</a>
+  );
+}
+
 const prettyDate = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
 export default function Book() {
@@ -99,7 +111,7 @@ export default function Book() {
       <div className="bk-mark warn" aria-hidden>!</div>
       <h1>{state === "expired" ? t.expired : t.error}</h1>
       <p className="bk-muted">{t.expiredHint}</p>
-      {info?.waNumber && <a className="bk-cta" href={`https://wa.me/${info.waNumber}`}>{t.back}</a>}
+      {info?.waNumber && <BackToWhatsApp number={info.waNumber} label={t.back} />}
     </main>
   );
   if (state === "done" && booked && info) return (
@@ -112,7 +124,7 @@ export default function Book() {
         <div className="bk-muted">{t.visits[visit]} · {info.clinic.name}</div>
       </div>
       <p className="bk-muted">{t.sent}</p>
-      {info.waNumber && <a className="bk-cta" href={`https://wa.me/${info.waNumber}`}>{t.back}</a>}
+      {info.waNumber && <BackToWhatsApp number={info.waNumber} label={t.back} />}
     </main>
   );
   if (!info) return null;

@@ -88,6 +88,10 @@ const P: Persona[] = [
     check: (r) => expectAll([has(r, "SESSION_RESTARTED"), "told it starts fresh"], [r.kinds.at(-1) === "MAIN_MENU", "then the menu"]) },
   { id: "u29", title: "Mid-booking asks for a new booking instead", setup: "self", steps: [{ say: "book me tomorrow" }, { say: "actually I want a new booking" }],
     check: (r) => expectAll([!r.kinds.slice(-1).includes("ASK_WHEN_RETRY"), "treated as a new booking, not a non-answer"]) },
+  { id: "u30", title: "Hinglish speaker asks to switch to English", setup: "self", steps: [{ say: "appointment chahiye kal" }, { say: "please reply in English" }, { say: "kal shaam 6 baje" }],
+    check: (r) => expectAll([has(r, "LANGUAGE_SET"), "language changed"], [!/[a-z]+ (hai|karein|chahiye)\b/i.test(r.texts.at(-1) ?? ""), "later replies in English"]) },
+  { id: "u31", title: "Picks Hindi from the menu", setup: "self", steps: [{ say: "hi" }, { tap: /Change language/ }, { tap: /हिंदी/ }, { say: "my appointments" }],
+    check: (r) => expectAll([has(r, "LANGUAGE_SET"), "language set"], [/[\u0900-\u097F]/.test(r.texts.at(-1) ?? ""), "replies in Hindi after typing English"]) },
 ];
 
 const only = process.argv.includes("--only") ? process.argv[process.argv.indexOf("--only") + 1] : null;

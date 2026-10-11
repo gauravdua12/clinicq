@@ -287,3 +287,11 @@ Sent from a whitelisted number to the clinic number. Case-insensitive; Hindi ali
 - **Start over:** "start over", "restart", "shuru se" gives `STARTED_OVER` from any point.
 - **New booking:** "I want to book" / "new booking" mid-booking starts that booking afresh.
 - **A reply with no day:** `ASK_WHEN_RETRY` with Show free times / Stop booking, instead of repeating the question.
+
+## Menu, language and session labels (11 Oct 2026, late)
+- **Main menu:** a WhatsApp list (a message can carry only 3 buttons) with Book appointment / My appointments / Queue status / **Change language**.
+- **Language:**
+  - "Change language" offers English / हिंदी / Hinglish. The choice is locked: replies stay in that language whatever the patient types, until they change it.
+  - Typed requests ("English please", "hindi mein baat karo", "reply in Hinglish") switch language directly. "Change language" with no language named shows the picker.
+- **In-chat session buttons** show clinic hours: "Morning (10am–1pm)", "Evening (5:10–8pm)".
+- **Booking page "Back to WhatsApp"** uses the WhatsApp app link (`whatsapp://send?phone=`), so iOS doesn't show its Messages / WhatsApp Business chooser. `wa.me` is the fallback.

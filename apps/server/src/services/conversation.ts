@@ -62,6 +62,15 @@ const RESTART_RE = /^\s*(start\s+(over|again|fresh)|restart|reset|new\s+chat|shu
 /** Buttons from a conversation that has since been reset; they no longer carry enough context to continue. */
 const STALE_BUTTON = /^(slot|vt|bk|see_all|sess|who|resume)(:|$)/;
 
+/** "English please", "hindi mein baat karo", "switch to Hinglish" → the language asked for (null if none named). */
+function languageTarget(text: string): Lang | null {
+  const s = text.toLowerCase();
+  if (/hinglish/.test(s)) return "hinglish";
+  if (/\b(english|angrezi|angreji)\b|अंग्रेज़ी|अंग्रेजी|इंग्लिश/.test(s)) return "en";
+  if (/\bhindi\b|हिंदी|हिन्दी/.test(s)) return "hi";
+  return null;
+}
+
 /** After these the conversation is complete; a bare "ok / sure / thanks" deserves a polite close, not a menu. */
 const CLOSING = new Set(["BOOKING_CONFIRMED", "CX_DONE", "CX_KEPT", "RS_DONE", "REMINDER_CONFIRMED", "STATUS", "STATUS_BOOKED", "STATUS_NEXT", "STATUS_FUTURE",
   "THANKS_REPLY", "ACK_CLOSING", "MY_DATA", "MY_APPOINTMENTS", "CLINIC_ADDRESS", "CLINIC_FEES", "CLINIC_TIMINGS", "ALT_NUMBER_SAVED", "ARRIVED_OK", "ALREADY_IN_QUEUE",
@@ -218,6 +227,9 @@ async function onText(t: Turn, text: string, isVoice: boolean): Promise<void> {
   if (emergencyKw) return emergency(t);
   if (RESTART_RE.test(text) && t.conv.state !== "AWAIT_CONSENT") return stopFlow(t, "STARTED_OVER");
   const abandon = ABANDON_RE.test(text);
+  const langTarget = languageTarget(text);
+  // "English please", "hindi mein baat karo", "Hinglish" on its own: a language request even if the model says otherwise.
+  const langRequest = !!langTarget && (/\b(language|bhasha|baat|talk|speak|switch|reply|please|pls|mein|me)\b|भाषा|में/i.test(text) || text.trim().split(/\s+/).length <= 2);
 
   const out = await extract(text, extractCtx(t), await t.ctx.cascade());
   const meta = { intent: out.extraction.intent, source: out.source, escalated: out.escalated, reasons: out.reasons, calls: out.calls.map((c) => ({ spec: c.spec, ok: c.ok, ms: c.latencyMs, err: c.error })) };
@@ -240,6 +252,8 @@ async function onText(t: Turn, text: string, isVoice: boolean): Promise<void> {
     await t.text("VOICE_UNDERSTOOD", { nameJi: t.nameJi(senderName(t)), when: whenLabel(t, e) });
   }
 
+  if (langRequest && langTarget && !e.date && e.time == null && !e.partOfDay) return setLanguage(t, langTarget);
+
   // Mid-way through a booking, understand what the patient wants now instead of repeating the last question.
   const inBooking = t.conv.state.startsWith("BK_");
   if (inBooking && (abandon || (e.intent === "CANCEL" && !e.date)) && !e.date && e.time == null && !e.partOfDay && !e.visitType) return stopFlow(t, "BOOKING_STOPPED");
@@ -258,7 +272,7 @@ async function onText(t: Turn, text: string, isVoice: boolean): Promise<void> {
     case "DELETE_DATA": t.set("ERASE_CONFIRM"); return t.buttons(t.t("ERASE_CONFIRM"), "ERASE_CONFIRM", [{ id: "erase:yes", title: t.b("YES_DELETE") }, { id: "erase:no", title: t.b("KEEP_IT") }]);
     case "STOP": await t.ctx.db.patientAccount.update({ where: { id: t.acc.id }, data: { optedOutAt: t.ctx.clock.now() } }); return t.text("OPTED_OUT");
     case "START": await t.ctx.db.patientAccount.update({ where: { id: t.acc.id }, data: { optedOutAt: null } }); return t.text("OPTED_IN");
-    case "CHANGE_LANGUAGE": t.conv.lang = e.language; t.conv.langLock = true; return t.text("LANGUAGE_SET");
+    case "CHANGE_LANGUAGE": return langTarget ? setLanguage(t, langTarget) : askLanguage(t);
     case "CHANGE_NUMBER": t.set("AWAIT_ALT_NUMBER"); return t.text("CHANGE_NUMBER_INFO");
     case "THANKS": if (t.conv.state === "IDLE" || !t.conv.state.startsWith("BK_")) return t.text("THANKS_REPLY"); break;
     case "CANCEL": if (t.conv.state !== "CX_CONFIRM" && t.conv.state !== "CX_PICK_APPT") return startCancel(t, e); break;
@@ -418,6 +432,7 @@ async function onButton(t: Turn, id: string): Promise<void> {
     case "sess": { const [date, label] = (a ?? "").split("|"); return slotPicker(t, date ?? nowLocal(t.ctx).date, false, label); }
     case "vt": t.conv.p.visitType = a as VisitType; return askConfirm(t);
     case "bk": return a === "yes" ? finalize(t) : a === "stop" ? stopFlow(t, "BOOKING_STOPPED") : changeTime(t);
+    case "lang": return a === "en" || a === "hi" || a === "hinglish" ? setLanguage(t, a) : askLanguage(t);
     case "resume":
       if (a === "go") return resumePrompt(t);
       if (a === "new") return newBooking(t, null);
@@ -445,6 +460,7 @@ async function onButton(t: Turn, id: string): Promise<void> {
       if (a === "book") { t.conv.p = { intent: "BOOK", profileId: t.conv.p.profileId }; return progressBooking(t); }
       if (a === "status") return status(t);
       if (a === "appts") return myAppointments(t);
+      if (a === "lang") return askLanguage(t);
       return menu(t, "MAIN_MENU");
     default:
       return menu(t, "OTHER_HELP");
@@ -729,8 +745,19 @@ async function slotPicker(t: Turn, fromDate: string, introSent = false, session?
     t.set("BK_PICK_SLOT");
     t.conv.offered = [];
     const dayLabel = T.fmtDayLabel(day, nowLocal(t.ctx).date, t.lang);
+    // Each session with its clinic hours, e.g. "Morning (10am–1pm)", "Evening (5:10–8pm)" (buttons hold 20 characters).
+    const sessionOf = new Map(t.info.sessions.map((x) => [x.id, x]));
+    const hours = new Map<string, string>();
+    for (const s of S.allSlotsOn(day, avail)) {
+      const def = sessionOf.get(s.sessionId);
+      if (def && !hours.has(s.sessionLabel)) hours.set(s.sessionLabel, T.fmtShortRange(T.toMin(def.startTime), T.toMin(def.endTime)));
+    }
+    const title = (label: string) => {
+      const span = hours.get(label) ?? "";
+      return [`${label} (${span})`, `${label} ${span}`, span].find((x) => span && [...x].length <= 20) ?? label.slice(0, 20);
+    };
     return t.buttons(t.t("LIST_PICK_SESSION", { dayLabel }), "LIST_PICK_SESSION",
-      [...bySession.entries()].slice(0, 3).map(([label, ss]) => ({ id: `sess:${day}|${label}`, title: `${label} (${ss.length})`.slice(0, 20) })));
+      [...bySession.keys()].slice(0, 3).map((label) => ({ id: `sess:${day}|${label}`, title: title(label) })));
   }
   const sections: ListSection[] = [];
   const offered: SlotRef[] = [];
@@ -1101,9 +1128,26 @@ async function callClinic(t: Turn): Promise<void> {
 
 async function menu(t: Turn, id: "MAIN_MENU" | "OTHER_HELP" | "BOOKING_STOPPED" | "STARTED_OVER"): Promise<void> {
   const name = t.profiles.find((p) => p.relation === "SELF")?.name ?? waName(t.acc);
-  return t.buttons(t.t(id, { nameJi: t.nameJi(name ? firstName(name) : null) }), id, [
-    { id: "menu:book", title: t.b("BOOK") }, { id: "menu:appts", title: t.b("MY_APPTS") }, { id: "menu:status", title: t.b("QUEUE_STATUS") },
-  ]);
+  // WhatsApp allows only 3 reply buttons, so the menu is a list: the three main actions plus "Change language".
+  await t.send({ kind: "list", body: t.t(id, { nameJi: t.nameJi(name ? firstName(name) : null) }), button: t.b("MENU_OPEN"), sections: [{ title: t.b("MENU"), rows: [
+    { id: "menu:book", title: t.b("BOOK"), description: t.t("BOOK_DESC") },
+    { id: "menu:appts", title: t.b("MY_APPTS"), description: t.t("MY_APPTS_DESC") },
+    { id: "menu:status", title: t.b("QUEUE_STATUS"), description: t.t("QUEUE_DESC") },
+    { id: "menu:lang", title: t.b("CHANGE_LANGUAGE"), description: t.t("LANGUAGES") },
+  ] }] }, id);
+}
+
+async function askLanguage(t: Turn): Promise<void> {
+  return t.buttons(t.t("LANGUAGE_PICK"), "LANGUAGE_PICK", [{ id: "lang:en", title: "English" }, { id: "lang:hi", title: "हिंदी" }, { id: "lang:hinglish", title: "Hinglish" }]);
+}
+
+/** The patient picked (or asked for) a language: use it from now on, whatever language they type in. */
+async function setLanguage(t: Turn, lang: Lang): Promise<void> {
+  t.conv.lang = lang;
+  t.conv.langLock = true;
+  await t.text("LANGUAGE_SET");
+  if (t.conv.state === "IDLE") return menu(t, "MAIN_MENU");
+  return resumePrompt(t);
 }
 
 /** Drop whatever was in progress (releasing a held slot) and show the menu. */

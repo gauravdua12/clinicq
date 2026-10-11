@@ -103,6 +103,21 @@ export function fmtDayLabel(date: string, today: string, lang: Lang = "en"): str
 }
 
 /** 1090 → "6:10 PM" */
+/** Compact form for tight labels: 9am, 9:30am, 1pm, 5:10pm. */
+export function fmtShortTime(min: number): string {
+  const h24 = Math.floor(min / 60) % 24;
+  const mm = min % 60;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}${mm ? `:${String(mm).padStart(2, "0")}` : ""}${h24 >= 12 ? "pm" : "am"}`;
+}
+
+/** "10am–1pm", "5:10–8pm" (am/pm written once when both ends share it). */
+export function fmtShortRange(a: number, b: number): string {
+  const same = (Math.floor(a / 60) >= 12) === (Math.floor(b / 60) >= 12);
+  const left = fmtShortTime(a);
+  return `${same ? left.replace(/[ap]m$/, "") : left}–${fmtShortTime(b)}`;
+}
+
 export function fmtTime(min: number | string): string {
   const m = typeof min === "string" ? toMin(min) : min;
   const h24 = Math.floor(m / 60);
