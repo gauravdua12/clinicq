@@ -15,7 +15,8 @@ build() {
   $AS env NODE_OPTIONS=--max-old-space-size=900 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 nice -n 15 npm ci --no-audit --no-fund --loglevel=error
   $AS env NODE_OPTIONS=--max-old-space-size=900 NEXT_PUBLIC_BASE_PATH= NEXT_TELEMETRY_DISABLED=1 nice -n 15 npm run build --silent
 }
-migrate() { cd "$APP" && $AS bash -c 'set -a; . /etc/clinicq/clinicq.env; set +a; npm run db:deploy --silent'; }
+# The database may be stopped while watsappai is the live demo; start it for the migration.
+migrate() { systemctl start postgresql && cd "$APP" && $AS bash -c 'set -a; . /etc/clinicq/clinicq.env; set +a; npm run db:deploy --silent'; }
 healthy() { for _ in $(seq 1 30); do curl -fsS "$HEALTH" 2>/dev/null | grep -q '"ok":true' && return 0; sleep 2; done; return 1; }
 live() { [ "$(cat /etc/demo-mode 2>/dev/null)" = clinicq ]; }
 units() {
@@ -39,6 +40,7 @@ caddy_bin() {
   echo "Caddy $v installed (checksum verified)"
 }
 
+main() {
 if [ "${1:-}" = first ]; then
   [ -d "$APP/.git" ] || $AS git clone -q "$REPO" "$APP"
   "$APP/deploy/pull-env.sh"
@@ -58,13 +60,24 @@ if [ "${1:-}" = first ]; then
 fi
 
 if [ "${1:-}" = update ]; then
+  # Fetch first, then re-run the *new* version of this script for the rest (never execute a file that just changed).
   cd "$APP"
   PREV=$($AS git rev-parse HEAD)
   $AS git fetch -q origin && $AS git reset -q --hard origin/main
+  exec bash "$APP/deploy/install.sh" apply "$PREV"
+fi
+
+if [ "${1:-}" = apply ]; then
+  PREV="${2:?previous commit}"
+  cd "$APP"
   echo "Updating ${PREV:0:7} → $($AS git rev-parse --short HEAD)"
   "$APP/deploy/pull-env.sh"
   units
-  if ! live; then build && migrate && echo "Built (ClinicQ isn't the live demo; nothing restarted)"; exit 0; fi
+  if ! live; then
+    build && migrate && echo "Built (ClinicQ isn't the live demo; nothing restarted)"
+    systemctl stop postgresql   # keep the box free for watsappai
+    exit 0
+  fi
   if build && migrate && systemctl restart clinicq && healthy && systemctl reload-or-restart clinicq-caddy; then
     echo "Updated and healthy: $(curl -s $HEALTH)"
   else
@@ -76,3 +89,6 @@ if [ "${1:-}" = update ]; then
   exit 0
 fi
 sed -n '2,6p' "$0"
+}
+# Parse the whole file before running anything (safe even if git replaces this file mid-run).
+main "$@"; exit $?
