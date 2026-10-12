@@ -52,6 +52,10 @@ describe("S2 returning patient + reminder + reschedule", () => {
     const evening = h.buttons(PATIENT)[1]!;
     expect(evening.title).toBe("5:30 PM");
     await h.tap(PATIENT, evening.id);
+    expect(await last(h, PATIENT)).toBe("RS_CONFIRM_ASK"); // nothing moves until confirmed
+    expect(h.lastText(PATIENT)).toMatch(/From: .*10:20 AM[\s\S]*To: .*5:30 PM/);
+    expect((await h.db.appointment.findUniqueOrThrow({ where: { id: appt.id } })).status).toBe("BOOKED");
+    await h.tap(PATIENT, "bk:yes");
     expect(await last(h, PATIENT)).toBe("RS_DONE");
     expect(h.lastText(PATIENT)).toContain("10:20 AM slot is released");
 

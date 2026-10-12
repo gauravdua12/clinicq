@@ -393,6 +393,16 @@ export const COPY = {
   MY_APPTS_DESC: { en: "See, reschedule or cancel", hi: "देखें, बदलें या कैंसल करें", hinglish: "Dekhein, badlein ya cancel karein" },
   QUEUE_DESC: { en: "Your turn today", hi: "आज आपकी बारी", hinglish: "Aaj aapki baari" },
   LANGUAGES: { en: "English · हिंदी · Hinglish", hi: "English · हिंदी · Hinglish", hinglish: "English · हिंदी · Hinglish" },
+  RS_CONFIRM_ASK: {
+    en: "Please confirm the change for *{{name}} ji*:\n\nFrom: {{oldDay}}, {{oldTime}}\nTo: *{{dayShort}}, {{time}}*\n📍 {{clinicName}}",
+    hi: "कृपया *{{name}} जी* का बदलाव कन्फ़र्म करें:\n\nपहले: {{oldDay}}, {{oldTime}}\nअब: *{{dayShort}}, {{time}}*\n📍 {{clinicName}}",
+    hinglish: "Please *{{name}} ji* ka change confirm karein:\n\nPehle: {{oldDay}}, {{oldTime}}\nAb: *{{dayShort}}, {{time}}*\n📍 {{clinicName}}",
+  },
+  LANGUAGE_OFFER: {
+    en: "🌐 Prefer another language?",
+    hi: "🌐 कोई और भाषा चाहिए?",
+    hinglish: "🌐 Koi aur language chahiye?",
+  },
   LANGUAGE_PICK: {
     en: "Which language would you like me to use?",
     hi: "मैं किस भाषा में बात करूँ?",
@@ -583,6 +593,7 @@ export const BTN = {
   CONFIRM: { en: "Confirm", hi: "कन्फ़र्म", hinglish: "Confirm" },
   CONFIRM_BOOKING: { en: "Confirm booking", hi: "कन्फ़र्म करें", hinglish: "Confirm karein" },
   CHANGE_TIME: { en: "Change time", hi: "समय बदलें", hinglish: "Time badlein" },
+  CONFIRM_CHANGE: { en: "Confirm change", hi: "बदलाव कन्फ़र्म करें", hinglish: "Confirm karein" },
   CONTINUE: { en: "Continue", hi: "जारी रखें", hinglish: "Continue karein" },
   NEW_BOOKING: { en: "New booking", hi: "नई बुकिंग", hinglish: "Nayi booking" },
   SOMETHING_ELSE: { en: "Something else", hi: "कुछ और", hinglish: "Kuch aur" },

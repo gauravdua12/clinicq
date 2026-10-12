@@ -40,7 +40,7 @@ const P: Persona[] = [
     check: (r) => expectAll([bookedOn(r, "2026-10-10", "10:00", "11:00"), "booked Sat 10–11"], [r.booked.some((b) => VOICE_NAME.test(b.name)), "patient named as in the note (Devanagari kept)"], [!r.texts.some((t) => /ऑर्थो|ortho/i.test(t)), "specialty/health not echoed"]) },
   { id: "u05", title: "Family: self at 6:30 then son same slot → next slot offered", setup: "self", steps: [{ say: "book me tomorrow 6:30 pm" }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म/ }, { say: "also book for my son Aarav tomorrow at 6:30 pm" }, { tap: /Book/ }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म/ }],
     check: (r) => expectAll([has(r, "SAME_SLOT_FAMILY"), "family same-slot offer"], [r.booked.length === 2, "two bookings"], [new Set(r.booked.map((b) => b.time)).size === 2, "different slots"]) },
-  { id: "u06", title: "Reschedule in plain words", setup: "self", steps: [{ say: "book me Monday 10:20 am" }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म/ }, { say: "shift my appointment to Wednesday evening" }, { tap: /PM/ }],
+  { id: "u06", title: "Reschedule in plain words", setup: "self", steps: [{ say: "book me Monday 10:20 am" }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म/ }, { say: "shift my appointment to Wednesday evening" }, { tap: /PM/ }, { tap: /^Confirm|कन्फ़र्म/ }],
     check: (r) => expectAll([has(r, "RS_DONE"), "rescheduled"], [bookedOn(r, "2026-10-14", "17:00"), "now on Wed evening"], [!bookedOn(r, "2026-10-12"), "Monday released"]) },
   { id: "u07", title: "Cancel in Hinglish", setup: "self", steps: [{ say: "book me tomorrow 11 am" }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म/ }, { say: "kal nahi aa paunga, cancel kar do" }, { say: "haan" }],
     check: (r) => expectAll([has(r, "CX_DONE"), "cancelled"], [r.booked.length === 0, "no active booking"]) },
@@ -90,7 +90,7 @@ const P: Persona[] = [
     check: (r) => expectAll([!r.kinds.slice(-1).includes("ASK_WHEN_RETRY"), "treated as a new booking, not a non-answer"]) },
   { id: "u30", title: "Hinglish speaker asks to switch to English", setup: "self", steps: [{ say: "appointment chahiye kal" }, { say: "please reply in English" }, { say: "kal shaam 6 baje" }],
     check: (r) => expectAll([has(r, "LANGUAGE_SET"), "language changed"], [!/[a-z]+ (hai|karein|chahiye)\b/i.test(r.texts.at(-1) ?? ""), "later replies in English"]) },
-  { id: "u31", title: "Picks Hindi from the menu", setup: "self", steps: [{ say: "hi" }, { tap: /Change language/ }, { tap: /हिंदी/ }, { say: "my appointments" }],
+  { id: "u31", title: "Picks Hindi from the language bubble under hi", setup: "self", steps: [{ say: "hi" }, { tap: /हिंदी/ }, { say: "my appointments" }],
     check: (r) => expectAll([has(r, "LANGUAGE_SET"), "language set"], [/[\u0900-\u097F]/.test(r.texts.at(-1) ?? ""), "replies in Hindi after typing English"]) },
 ];
 
@@ -122,8 +122,10 @@ for (const p of P.filter((x) => !only || x.id === only)) {
         log.push(`**Patient:** ${text.slice(0, 160)}${text.length > 160 ? "…" : ""}`);
         await h.say(PATIENT, text, "Ramesh Kumar");
       } else if ("tap" in s) {
-        const btn = h.buttons(PATIENT).find((b) => s.tap.test(b.title));
-        if (!btn) { errors.push(`no button matching ${s.tap} (had: ${h.buttons(PATIENT).map((b) => b.title).join(" | ")})`); break; }
+        // Like a person: buttons on the newest message first, then the couple of messages just above it.
+        const recent = h.wa.to(PATIENT).slice(-3).reverse().flatMap((m) => (m.kind === "buttons" ? m.buttons : m.kind === "list" ? m.sections.flatMap((x) => x.rows) : []));
+        const btn = recent.find((b) => s.tap.test(b.title));
+        if (!btn) { errors.push(`no button matching ${s.tap} (had: ${recent.map((b) => b.title).join(" | ")})`); break; }
         log.push(`**Patient taps:** [${btn.title}]`);
         await h.tap(PATIENT, btn.id, btn.title);
       } else if ("voice" in s) {

@@ -824,7 +824,8 @@ async function choose(t: Turn, ref: SlotRef): Promise<void> {
     const held = await holdSlot(t.ctx, slot, t.conv.p.profileId!, t.acc.id);
     t.conv.held = held.id;
     t.conv.offered = [ref];
-    if (t.conv.p.visitType || t.conv.p.intent === "RESCHEDULE") return finalize(t);
+    // Nothing is booked or moved without the patient confirming (a reschedule keeps its visit type).
+    if (t.conv.p.visitType || t.conv.p.intent === "RESCHEDULE") return askConfirm(t);
     return askVisitType(t);
   } catch (err) {
     if (err instanceof FamilySlotError) {
@@ -864,6 +865,13 @@ async function askConfirm(t: Turn): Promise<void> {
   const s = t.conv.offered?.[0];
   if (!t.conv.held || !s) return finalize(t);
   t.set("BK_CONFIRM");
+  if (t.conv.p.intent === "RESCHEDULE" && t.conv.p.rescheduleId) {
+    const old = await t.ctx.db.appointment.findUnique({ where: { id: t.conv.p.rescheduleId } });
+    if (old) {
+      return t.buttons(t.t("RS_CONFIRM_ASK", { name: currentName(t), oldDay: T.fmtDayShort(T.localDate(old.slotStart, t.ctx.tz), t.lang), oldTime: T.fmtTime(T.localMinutes(old.slotStart, t.ctx.tz)), dayShort: T.fmtDayShort(s.date, t.lang), time: T.fmtTime(s.startMin) }), "RS_CONFIRM_ASK",
+        [{ id: "bk:yes", title: t.b("CONFIRM_CHANGE") }, { id: "bk:change", title: t.b("CHANGE_TIME") }]);
+    }
+  }
   const vt = t.conv.p.visitType ?? "NEW";
   const visit = t.b(vt === "FOLLOW_UP" ? "FOLLOW_UP" : vt === "REPORT_SHOW" ? "REPORT_SHOW" : "NEW");
   return t.buttons(t.t("CONFIRM_BOOKING_ASK", { name: currentName(t), dayShort: T.fmtDayShort(s.date, t.lang), time: T.fmtTime(s.startMin), visit }), "CONFIRM_BOOKING_ASK",
@@ -1128,13 +1136,14 @@ async function callClinic(t: Turn): Promise<void> {
 
 async function menu(t: Turn, id: "MAIN_MENU" | "OTHER_HELP" | "BOOKING_STOPPED" | "STARTED_OVER"): Promise<void> {
   const name = t.profiles.find((p) => p.relation === "SELF")?.name ?? waName(t.acc);
-  // WhatsApp allows only 3 reply buttons, so the menu is a list: the three main actions plus "Change language".
-  await t.send({ kind: "list", body: t.t(id, { nameJi: t.nameJi(name ? firstName(name) : null) }), button: t.b("MENU_OPEN"), sections: [{ title: t.b("MENU"), rows: [
-    { id: "menu:book", title: t.b("BOOK"), description: t.t("BOOK_DESC") },
-    { id: "menu:appts", title: t.b("MY_APPTS"), description: t.t("MY_APPTS_DESC") },
-    { id: "menu:status", title: t.b("QUEUE_STATUS"), description: t.t("QUEUE_DESC") },
-    { id: "menu:lang", title: t.b("CHANGE_LANGUAGE"), description: t.t("LANGUAGES") },
-  ] }] }, id);
+  // WhatsApp allows 3 buttons per message: the three main actions stay one tap away. Until the patient has chosen a
+  // language, a small language bubble goes just above the menu (so the menu stays at the bottom, nearest the thumb).
+  if (id === "MAIN_MENU" && !t.conv.langLock) {
+    await t.buttons(t.t("LANGUAGE_OFFER"), "LANGUAGE_OFFER", [{ id: "lang:en", title: "English" }, { id: "lang:hi", title: "हिंदी" }, { id: "lang:hinglish", title: "Hinglish" }]);
+  }
+  return t.buttons(t.t(id, { nameJi: t.nameJi(name ? firstName(name) : null) }), id, [
+    { id: "menu:book", title: t.b("BOOK") }, { id: "menu:appts", title: t.b("MY_APPTS") }, { id: "menu:status", title: t.b("QUEUE_STATUS") },
+  ]);
 }
 
 async function askLanguage(t: Turn): Promise<void> {

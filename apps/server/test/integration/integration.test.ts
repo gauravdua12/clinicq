@@ -505,7 +505,7 @@ describe("coming back to an unfinished chat", () => {
     await midBooking();
     h.clock.advance(31 * 60_000);
     await h.say(PATIENT, "Hi");
-    expect((await h.kinds(PATIENT)).slice(-2)).toEqual(["SESSION_RESTARTED", "MAIN_MENU"]);
+    expect((await h.kinds(PATIENT)).slice(-3)).toEqual(["SESSION_RESTARTED", "LANGUAGE_OFFER", "MAIN_MENU"]);
     h.clock.advance(31 * 60_000);
     await h.tap(PATIENT, "see_all"); // an old button from the expired chat
     expect((await h.kinds(PATIENT)).slice(-1)).toEqual(["MAIN_MENU"]); // nothing pending any more → no notice, just the menu
@@ -516,7 +516,7 @@ describe("coming back to an unfinished chat", () => {
     await h.say(PATIENT, "tomorrow evening");
     h.clock.advance(31 * 60_000);
     await h.tap(PATIENT, "slot:2026-10-10|1090");
-    expect((await h.kinds(PATIENT)).slice(-2)).toEqual(["SESSION_RESTARTED", "MAIN_MENU"]);
+    expect((await h.kinds(PATIENT)).slice(-3)).toEqual(["SESSION_RESTARTED", "LANGUAGE_OFFER", "MAIN_MENU"]);
     expect(await h.db.appointment.count({ where: { status: { in: ["HELD", "BOOKED"] } } })).toBe(0);
   });
 
@@ -567,18 +567,16 @@ describe("coming back to an unfinished chat", () => {
 });
 
 describe("language choice", () => {
-  it("menu offers Change language; the choice sticks until changed; typed requests work", async () => {
+  it("menu shows its 3 buttons directly, with a language bubble above until a language is chosen; typed requests work", async () => {
     h = await harness({ start: "2026-10-09T12:00:00+05:30" });
     await onboard(h);
     await h.say(PATIENT, "Hi");
-    const m = h.wa.last(PATIENT);
-    expect(m?.kind).toBe("list"); // WhatsApp allows 3 buttons; the menu needs 4 options
-    expect(h.buttons(PATIENT).map((b) => b.title)).toEqual(["Book appointment", "My appointments", "Queue status", "Change language"]);
-    await h.tap(PATIENT, "menu:lang");
-    expect(h.buttons(PATIENT).map((b) => b.title)).toEqual(["English", "हिंदी", "Hinglish"]);
+    expect(h.buttons(PATIENT).map((b) => b.title)).toEqual(["Book appointment", "My appointments", "Queue status"]); // last message = the menu
+    const bubble = h.wa.to(PATIENT).at(-2);
+    expect(bubble?.kind === "buttons" && bubble.buttons.map((b) => b.title)).toEqual(["English", "हिंदी", "Hinglish"]);
     await h.tap(PATIENT, "lang:hi");
     const kinds = await h.kinds(PATIENT);
-    expect(kinds.slice(-2)).toEqual(["LANGUAGE_SET", "MAIN_MENU"]);
+    expect(kinds.slice(-2)).toEqual(["LANGUAGE_SET", "MAIN_MENU"]); // once chosen, no language bubble any more
     expect(h.wa.to(PATIENT).at(-2)?.kind === "text" && (h.wa.to(PATIENT).at(-2) as { body: string }).body).toMatch(/हिंदी में/);
     await h.say(PATIENT, "what are the clinic timings"); // typed in English, reply stays Hindi
     expect(h.lastText(PATIENT)).toMatch(/[ऀ-ॿ]/);
@@ -588,5 +586,28 @@ describe("language choice", () => {
     expect(h.lastText(PATIENT)).not.toMatch(/[ऀ-ॿ]/);
     await h.say(PATIENT, "change language");
     expect(h.buttons(PATIENT).map((b) => b.title)).toEqual(["English", "हिंदी", "Hinglish"]);
+  });
+});
+
+describe("always confirm before booking or moving", () => {
+  it("visit type said up front: still asks to confirm; reschedule 'Change time' keeps the old booking", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    Object.assign(h.ctx.env, { BOOKING_PAGE: false });
+    await onboard(h);
+    await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
+    await h.say(PATIENT, "follow up for me tomorrow 6:10 pm");
+    if ((await h.kinds(PATIENT)).at(-1) === "ASK_VISIT_TYPE") await h.tap(PATIENT, "vt:FOLLOW_UP");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("CONFIRM_BOOKING_ASK");
+    expect(await h.db.appointment.count({ where: { status: "BOOKED" } })).toBe(0);
+    await h.tap(PATIENT, "bk:yes");
+    const appt = await h.db.appointment.findFirstOrThrow({ where: { status: "BOOKED" } });
+    await h.tap(PATIENT, `appt:rs:${appt.id}`);
+    await h.say(PATIENT, "monday 11 am");
+    if ((await h.kinds(PATIENT)).at(-1) !== "RS_CONFIRM_ASK") await h.tap(PATIENT, h.buttons(PATIENT)[0]!.id);
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("RS_CONFIRM_ASK");
+    await h.tap(PATIENT, "bk:change"); // changes their mind about the new time
+    expect((await h.db.appointment.findUniqueOrThrow({ where: { id: appt.id } })).status).toBe("BOOKED"); // old booking untouched
+    expect(await h.db.appointment.count({ where: { status: "HELD" } })).toBe(0);
+    Object.assign(h.ctx.env, { BOOKING_PAGE: true });
   });
 });

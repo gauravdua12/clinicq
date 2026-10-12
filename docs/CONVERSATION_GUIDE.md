@@ -289,9 +289,10 @@ Sent from a whitelisted number to the clinic number. Case-insensitive; Hindi ali
 - **A reply with no day:** `ASK_WHEN_RETRY` with Show free times / Stop booking, instead of repeating the question.
 
 ## Menu, language and session labels (11 Oct 2026, late)
-- **Main menu:** a WhatsApp list (a message can carry only 3 buttons) with Book appointment / My appointments / Queue status / **Change language**.
+- **Main menu:** the three buttons shown directly (Book appointment / My appointments / Queue status). WhatsApp allows 3 buttons per message, so until the patient has chosen a language, a small bubble *"🌐 Prefer another language?"* with **English / हिंदी / Hinglish** goes just above it.
 - **Language:**
   - "Change language" offers English / हिंदी / Hinglish. The choice is locked: replies stay in that language whatever the patient types, until they change it.
   - Typed requests ("English please", "hindi mein baat karo", "reply in Hinglish") switch language directly. "Change language" with no language named shows the picker.
 - **In-chat session buttons** show clinic hours: "Morning (10am–1pm)", "Evening (5:10–8pm)".
 - **Booking page "Back to WhatsApp"** uses the WhatsApp app link (`whatsapp://send?phone=`), so iOS doesn't show its Messages / WhatsApp Business chooser. `wa.me` is the fallback.
+- **Rescheduling** also confirms before anything moves: `RS_CONFIRM_ASK` shows From / To with **Confirm change / Change time**. "Change time" leaves the existing booking untouched. A booking where the visit type was already given also confirms first.
