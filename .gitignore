@@ -11,3 +11,4 @@ node_modules/
 out/
 packages/db/src/generated/
 /test-results/
+demo-video/
