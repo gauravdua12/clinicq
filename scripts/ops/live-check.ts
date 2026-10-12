@@ -59,7 +59,13 @@ try {
     else if (s === "BK_WHO") await tap("who:other");
     else if (s === "BK_NAME") await say("Sunita");
     else if (s === "BK_WHEN" || s === "IDLE") await say(`kal ${spoken} mummy ke liye`);
-    else if (s === "BK_PICK_SLOT") await tap(`slot:${tomorrow}|${slotMin}`);
+    else if (s === "BK_PICK_SLOT") {
+      // The asked-for slot may already be taken on a live clinic: then take the first time the bot offered instead.
+      const conv = await db.conversationState.findUnique({ where: { accountId: (await account())!.id } });
+      const offered = ((conv?.context as { offered?: { date: string; startMin: number }[] } | null)?.offered ?? []);
+      const pick = seen.filter((x) => x === "BK_PICK_SLOT").length > 1 && offered[0] ? offered[0] : { date: tomorrow, startMin: slotMin };
+      await tap(`slot:${pick.date}|${pick.startMin}`);
+    }
     else if (s === "BK_VISIT_TYPE") await tap("vt:NEW");
     else if (s === "BK_CONFIRM") await tap("bk:yes");
     else if (s === "BK_SAME_FAMILY") await tap("who:other");
@@ -68,8 +74,9 @@ try {
   const appts = await booked();
   check("booking completed through the live conversation", appts.length === 1, `states: ${seen.join(" → ")}`);
   const want = `${tomorrow}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
-  const slotOk = appts[0] && new Date(appts[0].slotStart.getTime() + 5.5 * 3600_000).toISOString().slice(0, 16) === want;
-  check(`booked the requested slot (${want} IST)`, !!slotOk, appts[0]?.slotStart.toISOString());
+  const got = appts[0] ? new Date(appts[0].slotStart.getTime() + 5.5 * 3600_000).toISOString().slice(0, 16) : "";
+  const tookAlternative = seen.filter((x) => x === "BK_PICK_SLOT").length > 1;
+  check(`booked the requested slot (${want} IST), or an offered one if it was taken`, got === want || (tookAlternative && got.startsWith(tomorrow)), got);
   const prof = appts[0]?.profileId ? await db.patientProfile.findUnique({ where: { id: appts[0].profileId } }) : null;
   const name = prof?.name ? decrypt(prof.name) : "";
   check("patient name understood as Sunita (stored encrypted)", /sunita/i.test(name) && !/sunita/i.test(prof?.name ?? ""), name || "none");
