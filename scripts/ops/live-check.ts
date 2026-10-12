@@ -137,6 +137,28 @@ try {
   check("patient erased their data via WhatsApp", (await account()) === null);
   const left = appts[0] ? await db.appointment.findUnique({ where: { id: appts[0].id } }) : null;
   check("their booking was released", !left || left.status === "CANCELLED", left?.status);
+
+  // 7. Off-script messages with the live AI (a second check patient): never the same question again, never an unsubscribe
+  const FROM2 = `9198001${String(randomInt(0, 100000)).padStart(5, "0")}`;
+  const post2 = async (message: Record<string, unknown>) => {
+    const raw = JSON.stringify(buildWebhook({ from: FROM2, name: "Live Check", wamid: `wamid.live.${randomUUID()}`, message }));
+    await fetch(`${BASE}/webhook`, { method: "POST", headers: { "content-type": "application/json", "x-hub-signature-256": signBody(raw, SECRET) }, body: raw });
+  };
+  const acc2 = () => db.patientAccount.findUnique({ where: { phoneHash: phoneHash(FROM2) } });
+  const outKinds = async () => { const a = await acc2(); return a ? (await db.messageLog.findMany({ where: { accountId: a.id, direction: "OUT" }, orderBy: { createdAt: "asc" } })).map((m) => m.kind.replace(/^failed:/, "")) : []; };
+  await post2({ type: "text", text: { body: "Hi" } });
+  await post2({ type: "interactive", interactive: { type: "button_reply", button_reply: { id: "consent:yes", title: "I agree" } } });
+  await post2({ type: "text", text: { body: "Stupid" } });
+  await post2({ type: "text", text: { body: "Hold" } });
+  await post2({ type: "text", text: { body: "Stop it now" } });
+  const k = await outKinds();
+  check("off-script: 'Hold' gets 'take your time'", k.includes("WAIT_OK"), k.join(","));
+  check("off-script: 'Stop it now' is not an unsubscribe", !k.includes("OPTED_OUT") && !(await acc2())?.optedOutAt);
+  await post2({ type: "text", text: { body: "ok" } });
+  check("off-script: then carries on to the menu", (await outKinds()).at(-1) === "MAIN_MENU" && !!(await acc2())?.numberConfirmedAt);
+  await post2({ type: "text", text: { body: "delete my data" } });
+  await post2({ type: "interactive", interactive: { type: "button_reply", button_reply: { id: "erase:yes", title: "Yes, delete" } } });
+  check("off-script check patient erased", (await acc2()) === null);
 } catch (e) {
   check("unexpected error", false, String(e));
 } finally {
