@@ -148,3 +148,21 @@ New in this round:
 - a final "Confirm booking" step, and the console switch between the booking page and the in-chat format;
 - the language model and Demo Studio restricted to Incolo's internal admins, and 15-minute default slots;
 - the 30-minute reset with notice, and changing course mid-booking.
+
+## Update: 12 Oct 2026 (off-script messages)
+| Layer | Result |
+|---|---|
+| Automated (unit, integration, e2e, data boundary) | ✅ 149/149 |
+| New: off-script matrix, 20 states × 16 messages, each sent twice | ✅ no repeated message, no error, apology where due |
+| UI in real Chrome | ✅ 12/12 |
+| User-level, live AI | ✅ 36/36 (new u32–u36: the reported chat, Hinglish frustration mid-booking, "what can you do?", off-topic, gibberish) |
+| AI evaluation, 224 cases, cascade | 96.0% all-fields, 96.9% critical; 100% health and emergency recall |
+
+Found and fixed by the matrix besides the reported problem:
+- "tell me a joke" was read as "for me" (book for myself): a bare "me" no longer means the patient.
+- "what can you do?" switched the reply language to Hinglish ("do"): short English-Hindi words count only in pairs.
+- Saying "no" to deleting data replied "your appointment stays as it is": now "I haven't deleted anything".
+- "bakwas band karo" (stop this nonsense) was an unsubscribe: now an apology; "messages band karo" still unsubscribes.
+
+Checked and not a bug: the "turn is near" alert said ~45 min and the status reply ~30 min only because the demo recording moved the
+clock 13 minutes between them; a new test confirms both give the same wait at the same moment.

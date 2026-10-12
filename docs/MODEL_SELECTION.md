@@ -69,6 +69,10 @@ WhatsApp voice notes (OGG/Opus) are decoded to 16 kHz WAV **in memory** (WebAsse
 gpt-oss-20b/120b and Claude Haiku 4.5 on classic Bedrock are blocked by Free-plan quotas and the Marketplace payment requirement (see `docs/runbooks/aws-bedrock-access.md`). Adapters for both are built; after the account upgrade, re-run the bake-off with `--models bedrock:openai.gpt-oss-120b-1:0,anthropic-bedrock:in.anthropic.claude-haiku-4-5-20251001-v1:0`.
 
 ### Change log
+- **12 Oct 2026:** prompt `2026-10-12.2` adds three intents, `WAIT`, `RUDE` and `HELP`, after a patient's "Stupid" / "Hold" / "Stop it now"
+  were answered with the same question. The first wording made the model call "I'll be 10 min late" `WAIT` and "Stop it now" `STOP`;
+  the prompt now says being late is not `WAIT`, and "stop it / stop repeating" is `RUDE`. 14 dev cases added (o01–o14), none to the
+  held-out set. Cascade: **96.0% all-fields, 96.9% critical** (was 95.7%), health and emergency recall 100%; all 14 new cases pass.
 - **11 Oct 2026:** two deterministic guards were refined after real-phone testing.
   - Numbers that are durations, counts or amounts ("3 din se", "2 weeks", "₹500", "5 saal") no longer count as evidence of a time.
   - A timings question that names a day but no time ("open on Sunday?") stays a clinic-info question.

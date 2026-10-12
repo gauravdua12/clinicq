@@ -6,11 +6,13 @@ import { emptyExtraction, type Extraction, type Intent, type Relation } from "./
 // Deterministic extractor: offline fallback, and the baseline in the model bake-off.
 
 const DEVANAGARI = /[ऀ-ॿ]/;
-const HINGLISH_WORDS = /\b(hai|hain|kal|aaj|parso|mujhe|mera|meri|mere|karna|karni|chahiye|baje|bje|kab|ke|ki|ko|liye|nahi|nahin|ho|raha|rahi|aap|kya|kaise|theek|thik|haan|ji|subah|shaam|sham|dopahar|raat|wala|wali|abhi|pahunch|dikhana|dikhane|badal|karo|kar|dena|do|tha|thi|bhi|aur|se|pehle|baad|aas|paas|lagbhag|mummy|papa|beta|beti|kitna|kitne|kahan|kaun|kaunsa|milega|milna|sakta|sakti|paunga|paungi|dobara|bukhar|dard)\b/i;
+const HINGLISH_WORDS = /\b(hai|hain|kal|aaj|parso|mujhe|mera|meri|mere|karna|karni|chahiye|baje|bje|kab|liye|nahi|nahin|raha|rahi|aap|kya|kaise|theek|thik|haan|ji|subah|shaam|sham|dopahar|raat|wala|wali|abhi|pahunch|dikhana|dikhane|badal|karo|dena|tha|thi|bhi|aur|pehle|baad|aas|paas|lagbhag|mummy|papa|beta|beti|kitna|kitne|kahan|kaun|kaunsa|milega|milna|sakta|sakti|paunga|paungi|dobara|bukhar|dard)\b/i;
+// Short words that are also English ("do", "so"…) only count when there are two of them ("kar do", "ke liye" is caught above).
+const HINGLISH_WEAK = /\b(ke|ki|ko|ho|kar|do|se)\b/gi;
 
 export function detectLanguage(text: string): Extraction["language"] {
   if (DEVANAGARI.test(text)) return "hi";
-  return HINGLISH_WORDS.test(text) ? "hinglish" : "en";
+  return HINGLISH_WORDS.test(text) || (text.match(HINGLISH_WEAK)?.length ?? 0) >= 2 ? "hinglish" : "en";
 }
 
 const WEEKDAYS: [RegExp, number][] = [
@@ -170,6 +172,10 @@ function intentOf(t: string, ctx: ExtractContext, extracted: { time: string | nu
   const has = (re: RegExp) => re.test(s);
   if (has(/\b(delete|erase|remove|hatao|hata do|mita)\b.*\b(data|details|information|jankari)|\b(data|details|jankari)\b.*\b(delete|hatao|hata|remove|mita)/)) return "DELETE_DATA";
   if (has(/\b(my|mera|meri)\s+(data|details|information|jankari)\b/)) return "MY_DATA";
+  // "stop it now" / "stop repeating" out of frustration is a complaint about the replies, not a request to unsubscribe.
+  if (has(/^stop (it|this|that|now|repeating)\b|\bstop repeating\b|\bsame (message|reply|thing) again\b/)) return "RUDE";
+  const unsubscribe = has(/^(stop|unsubscribe)$|\bunsubscribe\b|\bstop (sending|messaging|the messages)\b|\b(mat bhejo|messages? band|message mat)\b/);
+  if (!unsubscribe && has(/\b(stupid|idiot|useless|nonsense|rubbish|dumb|fool|shut up|bakwas|bakwaas|bekar|bekaar|pagal|bewakoof|bevkoof|ghatiya|faltu|wtf|stop repeating|same message|bad bot)\b|बकवास|बेकार|पागल|बेवकूफ|घटिया/)) return "RUDE";
   if (has(/^(stop|unsubscribe)\b|\bstop sending\b|\b(band karo|mat bhejo|messages? band)\b/)) return "STOP";
   if (has(/^start$/)) return "START";
   if (has(/\b(change|update|badal)\w*\s+(my\s+)?(number|mobile|phone)|\b(number|mobile)\s+(change|badal)|\bwrong number\b|\bnaya number\b/)) return "CHANGE_NUMBER";
@@ -186,6 +192,8 @@ function intentOf(t: string, ctx: ExtractContext, extracted: { time: string | nu
     if (/BK_PICK_SLOT/.test(ctx.state) && extracted.time) return "PROVIDE";
     return /BK_|RS_|WALKIN/.test(ctx.state) && !has(/\b(book|booking|appointment)\b|\b(new|naya|nayi|another|dusra|doosra|ek aur)\b/) ? "PROVIDE" : "BOOK";
   }
+  if (s.split(/\s+/).length <= 6 && has(/^(hold( on)?|wait|one (min|minute|sec|second)|1 (min|minute)|give me a (min|minute|sec|second)|ek (min|minute|second)|ruko|rukiye|ruk jao|ruk|later|busy|baad mein|baad me|abhi busy)\b|\b(will (reply|tell|come back|get back) later|baad mein (batata|batati|bataunga|bataungi|karta|karti|baat))|रुको|रुकिए|बाद में/)) return "WAIT";
+  if (s.split(/\s+/).length <= 8 && has(/^(help|madad|menu|options?)\b|\b(what can you do|what do you do|who are you|are you (a )?(bot|robot|human|real)|how does (this|it) work|kya kar sakte|kaun ho|kya ho tum|how to use)\b|मदद/)) return "HELP";
   if (has(/^(hi+|hello|hey|hlo|namaste|namaskar|good (morning|afternoon|evening))\b/) && s.split(/\s+/).length <= 4) return "GREETING";
   if (has(/^(no|nahi|nahin|na|nope|nah|mat)\b/)) return extracted.time || extracted.date ? "DENY" : "DENY";
   if (has(/^(yes|haan|ha|han|haa|ok|okay|okk|theek|thik|sure|done|confirm|ji|ji haan|yep|yup|chalega|sahi)\b/)) return "AFFIRM";
@@ -218,7 +226,7 @@ export function rulesExtract(text: string, ctx: ExtractContext): Extraction {
 
   let relation: Relation | null = null;
   for (const [re, rel] of REL_WORDS) if (re.test(t)) { relation = rel; break; }
-  const self = /\b(for me|myself|mere liye|mera|mujhe|apne liye|for myself|i want|i need|me)\b|मुझे|मेरे लिए/i.test(lower);
+  const self = /\b(for me|myself|mere liye|mera|mujhe|apne liye|for myself|i want|i need)\b|मुझे|मेरे लिए/i.test(lower); // not a bare "me" ("tell me", "kal me")
   if (relation) {
     out.relation = relation;
     const prof = ctx.profiles.find((p) => p.relation === relation);

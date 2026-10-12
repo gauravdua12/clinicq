@@ -464,14 +464,14 @@ export const COPY = {
     hinglish: "Yeh lamba voice note hai 😊 Bas din aur time bata dijiye kab aana hai.",
   },
   MAIN_MENU: {
-    en: "Hello{{nameJi}} 😊 How can I help today?",
-    hi: "नमस्ते{{nameJi}} 😊 आज मैं कैसे मदद करूँ?",
-    hinglish: "Namaste{{nameJi}} 😊 Aaj kaise madad karoon?",
+    en: ["Hello{{nameJi}} 😊 How can I help today?", "Hi again{{nameJi}} 👋 What would you like to do?"],
+    hi: ["नमस्ते{{nameJi}} 😊 आज मैं कैसे मदद करूँ?", "फिर से नमस्ते{{nameJi}} 👋 आप क्या करना चाहेंगे?"],
+    hinglish: ["Namaste{{nameJi}} 😊 Aaj kaise madad karoon?", "Phir se namaste{{nameJi}} 👋 Kya karna chahenge?"],
   },
   OTHER_HELP: {
-    en: "I can help you book, reschedule, cancel or check your turn in the queue. What would you like to do?",
-    hi: "मैं बुकिंग, री-शेड्यूल, कैंसल या कतार में आपकी बारी बताने में मदद कर सकती हूँ। आप क्या करना चाहेंगे?",
-    hinglish: "Main booking, reschedule, cancel ya queue mein baari batane mein madad kar sakti hoon. Kya karna hai?",
+    en: ["I can help you book, reschedule, cancel or check your turn in the queue. What would you like to do?", "Here's what I can do: book, reschedule or cancel a visit, or check your turn in the queue. Please pick one."],
+    hi: ["मैं बुकिंग, री-शेड्यूल, कैंसल या कतार में आपकी बारी बताने में मदद कर सकती हूँ। आप क्या करना चाहेंगे?", "मैं ये कर सकती हूँ: बुकिंग, री-शेड्यूल या कैंसल, या कतार में आपकी बारी बताना। कृपया एक चुनें।"],
+    hinglish: ["Main booking, reschedule, cancel ya queue mein baari batane mein madad kar sakti hoon. Kya karna hai?", "Main yeh kar sakti hoon: booking, reschedule ya cancel, ya queue mein aapki baari batana. Please ek chuniye."],
   },
   CLINIC_TIMINGS: {
     en: "{{clinicName}} timings: {{sessionsText}}.",
@@ -487,6 +487,61 @@ export const COPY = {
     en: "Consultation fee: {{fees}}. For anything else about fees, please call {{clinicPhone}}.",
     hi: "कंसल्टेशन फ़ीस: {{fees}}। फ़ीस से जुड़ी और जानकारी के लिए {{clinicPhone}} पर कॉल करें।",
     hinglish: "Consultation fee: {{fees}}. Fees ke baare mein aur jaankari ke liye {{clinicPhone}} par call karein.",
+  },
+  OFF_TOPIC: {
+    en: ["Sorry{{nameJi}}, I can't help with that here 🙏 I can book, reschedule or cancel appointments, tell you your turn in the queue, or share the clinic's timings and address. What would you like to do?", "Sorry{{nameJi}}, that's outside what I can do 🙏 I can help with appointments, your turn in the queue, and the clinic's timings and address. What would you like to do?"],
+    hi: ["माफ़ कीजिए{{nameJi}}, इसमें मैं यहाँ मदद नहीं कर सकती 🙏 मैं अपॉइंटमेंट बुक, री-शेड्यूल या कैंसल कर सकती हूँ, कतार में आपकी बारी बता सकती हूँ, या क्लिनिक का समय और पता बता सकती हूँ। आप क्या करना चाहेंगे?", "माफ़ कीजिए{{nameJi}}, यह मेरे काम से बाहर है 🙏 मैं अपॉइंटमेंट, कतार में आपकी बारी, और क्लिनिक के समय व पते में मदद कर सकती हूँ। आप क्या करना चाहेंगे?"],
+    hinglish: ["Sorry{{nameJi}}, isme main yahan madad nahi kar sakti 🙏 Main appointment book, reschedule ya cancel kar sakti hoon, queue mein aapki baari bata sakti hoon, ya clinic ka time aur address bata sakti hoon. Kya karna hai?", "Sorry{{nameJi}}, yeh mere kaam se bahar hai 🙏 Main appointments, queue mein aapki baari, aur clinic ke time aur address mein madad kar sakti hoon. Kya karna hai?"],
+  },
+  ERASE_KEPT: {
+    en: "Okay, I haven't deleted anything. Your details stay as they are 😊",
+    hi: "ठीक है, मैंने कुछ भी डिलीट नहीं किया। आपकी जानकारी जैसी थी वैसी ही है 😊",
+    hinglish: "Theek hai, maine kuch bhi delete nahi kiya. Aapki details jaisi thi waisi hi hain 😊",
+  },
+  RUDE_REPLY: {
+    en: ["I'm sorry if I've been unhelpful{{nameJi}} 🙏 I'm the appointment assistant for {{clinicName}}: I can book, reschedule or cancel a visit, tell you your turn in the queue, or share the clinic's timings and address. For anything else, please call {{clinicPhone}}.", "Sorry again{{nameJi}} 🙏 I can only help with appointments at {{clinicName}}: booking, rescheduling, cancelling, your turn in the queue, and the clinic's timings or address. To speak to someone, please call {{clinicPhone}}."],
+    hi: ["माफ़ कीजिए अगर मुझसे आपको परेशानी हुई{{nameJi}} 🙏 मैं {{clinicName}} की अपॉइंटमेंट असिस्टेंट हूँ: बुकिंग, री-शेड्यूल, कैंसल, कतार में आपकी बारी, और क्लिनिक का समय व पता बताने में मदद कर सकती हूँ। बाकी किसी बात के लिए {{clinicPhone}} पर कॉल करें।", "फिर से माफ़ी{{nameJi}} 🙏 मैं सिर्फ़ {{clinicName}} के अपॉइंटमेंट में मदद कर सकती हूँ: बुकिंग, री-शेड्यूल, कैंसल, कतार में आपकी बारी, और क्लिनिक का समय या पता। किसी से बात करने के लिए {{clinicPhone}} पर कॉल करें।"],
+    hinglish: ["Sorry agar mujhse aapko pareshani hui{{nameJi}} 🙏 Main {{clinicName}} ki appointment assistant hoon: booking, reschedule, cancel, queue mein aapki baari, aur clinic ka time aur address batane mein madad kar sakti hoon. Kisi aur baat ke liye {{clinicPhone}} par call karein.", "Phir se sorry{{nameJi}} 🙏 Main sirf {{clinicName}} ke appointments mein madad kar sakti hoon: booking, reschedule, cancel, queue mein aapki baari, aur clinic ka time ya address. Kisi se baat karne ke liye {{clinicPhone}} par call karein."],
+  },
+  WAIT_OK: {
+    en: ["No problem, take your time 🙂 Reply whenever you're ready and we'll carry on from here (I'll keep your place for 30 minutes).", "Sure, no rush 🙂 Your place is saved for 30 minutes; just reply when you're ready."],
+    hi: ["कोई बात नहीं, आराम से 🙂 जब तैयार हों तब जवाब दें, हम यहीं से आगे बढ़ेंगे (30 मिनट तक मैं यह बातचीत संभाल कर रखूँगी)।", "ज़रूर, कोई जल्दी नहीं 🙂 30 मिनट तक आपकी बातचीत सुरक्षित है; जब तैयार हों तब जवाब दें।"],
+    hinglish: ["Koi baat nahi, aaram se 🙂 Jab ready hon tab reply kijiye, hum yahin se aage badhenge (30 minute tak main yeh chat sambhal ke rakhoongi).", "Zaroor, koi jaldi nahi 🙂 30 minute tak aapki chat save hai; jab ready hon tab reply kijiye."],
+  },
+  WAIT_OK_IDLE: {
+    en: ["Sure, take your time 🙂 Message me whenever you need anything.", "No problem 🙂 I'm here whenever you need me."],
+    hi: ["ज़रूर, आराम से 🙂 जब भी ज़रूरत हो, मैसेज कीजिए।", "कोई बात नहीं 🙂 जब भी ज़रूरत हो, मैं यहीं हूँ।"],
+    hinglish: ["Zaroor, aaram se 🙂 Jab bhi zaroorat ho, message kijiye.", "Koi baat nahi 🙂 Jab bhi zaroorat ho, main yahin hoon."],
+  },
+  HELP_REPLY: {
+    en: ["I'm the WhatsApp appointment assistant for {{clinicName}}. I can:\n• book an appointment\n• show, reschedule or cancel your appointments\n• tell you your turn in the queue\n• share the clinic's timings and address\nType in English, Hindi or Hinglish, or send a voice note. Medical advice is given by Doctor during your consultation.", "Here's how I can help at {{clinicName}}:\n• book an appointment\n• show, reschedule or cancel your bookings\n• tell you your turn in the queue\n• share the clinic's timings and address\nJust type what you need in English, Hindi or Hinglish, or send a voice note."],
+    hi: ["मैं {{clinicName}} की WhatsApp अपॉइंटमेंट असिस्टेंट हूँ। मैं:\n• अपॉइंटमेंट बुक कर सकती हूँ\n• आपके अपॉइंटमेंट दिखा, री-शेड्यूल या कैंसल कर सकती हूँ\n• कतार में आपकी बारी बता सकती हूँ\n• क्लिनिक का समय और पता बता सकती हूँ\nहिंदी, English या Hinglish में लिखें, या वॉइस नोट भेजें। डॉक्टर की सलाह कंसल्टेशन के दौरान ही दी जाती है।", "{{clinicName}} में मैं इनमें मदद कर सकती हूँ:\n• अपॉइंटमेंट बुक करना\n• आपकी बुकिंग दिखाना, री-शेड्यूल या कैंसल करना\n• कतार में आपकी बारी बताना\n• क्लिनिक का समय और पता बताना\nबस लिखिए आपको क्या चाहिए, हिंदी, English या Hinglish में, या वॉइस नोट भेजिए।"],
+    hinglish: ["Main {{clinicName}} ki WhatsApp appointment assistant hoon. Main:\n• appointment book kar sakti hoon\n• aapke appointments dikha, reschedule ya cancel kar sakti hoon\n• queue mein aapki baari bata sakti hoon\n• clinic ka time aur address bata sakti hoon\nEnglish, Hindi ya Hinglish mein likhiye, ya voice note bhejiye. Medical salah Doctor consultation ke dauran hi dete hain.", "{{clinicName}} mein main inme madad kar sakti hoon:\n• appointment book karna\n• aapki booking dikhana, reschedule ya cancel karna\n• queue mein aapki baari batana\n• clinic ka time aur address batana\nBas likhiye aapko kya chahiye, English, Hindi ya Hinglish mein, ya voice note bhejiye."],
+  },
+  NOT_UNDERSTOOD: {
+    en: ["Sorry, I didn't quite understand that{{nameJi}}.", "Sorry{{nameJi}}, I didn't get that."],
+    hi: ["माफ़ कीजिए{{nameJi}}, मैं समझ नहीं पाई।", "माफ़ कीजिए{{nameJi}}, यह मुझे समझ नहीं आया।"],
+    hinglish: ["Sorry{{nameJi}}, main samajh nahi paayi.", "Sorry{{nameJi}}, yeh mujhe samajh nahi aaya."],
+  },
+  HELLO_AGAIN: {
+    en: ["Hello again{{nameJi}} 😊", "Hi{{nameJi}} 👋 I'm still here."],
+    hi: ["फिर से नमस्ते{{nameJi}} 😊", "नमस्ते{{nameJi}} 👋 मैं यहीं हूँ।"],
+    hinglish: ["Phir se namaste{{nameJi}} 😊", "Namaste{{nameJi}} 👋 Main yahin hoon."],
+  },
+  NUMBER_WHY: {
+    en: "I just need to know which number to use for your booking confirmation and reminders.",
+    hi: "बस यह जानना है कि बुकिंग की पुष्टि और रिमाइंडर किस नंबर पर भेजूँ।",
+    hinglish: "Bas yeh jaanna hai ki booking confirmation aur reminders kis number par bhejoon.",
+  },
+  GATE_CALL_ALT: {
+    en: "If you'd rather not, you can also call the clinic at {{clinicPhone}} 📞.",
+    hi: "चाहें तो आप क्लिनिक को {{clinicPhone}} पर कॉल भी कर सकते हैं 📞।",
+    hinglish: "Chahein to aap clinic ko {{clinicPhone}} par call bhi kar sakte hain 📞.",
+  },
+  STUCK_HELP: {
+    en: "Sorry{{nameJi}}, I'm having trouble understanding 🙏 Please tap an option: carry on where we were, go to the main menu, or call the clinic.",
+    hi: "माफ़ कीजिए{{nameJi}}, मुझे समझने में दिक्कत हो रही है 🙏 कृपया एक विकल्प चुनें: जहाँ थे वहीं से जारी रखें, मेन्यू पर जाएँ, या क्लिनिक को कॉल करें।",
+    hinglish: "Sorry{{nameJi}}, mujhe samajhne mein dikkat ho rahi hai 🙏 Please ek option chuniye: jahan the wahin se continue karein, menu par jaayein, ya clinic ko call karein.",
   },
   TALK_TO_STAFF: {
     en: "Sure. You can call the clinic at {{clinicPhone}} 📞 ({{sessionHours}}). I've also let the reception know you'd like a call back.",

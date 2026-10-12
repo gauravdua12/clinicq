@@ -26,7 +26,7 @@ export const Extraction = z.object({
   intent: z.enum([
     "GREETING","BOOK","RESCHEDULE","CANCEL","STATUS","ARRIVED","MY_APPOINTMENTS",
     "CLINIC_INFO","TALK_TO_STAFF","MY_DATA","DELETE_DATA","STOP","START",
-    "CHANGE_NUMBER","CHANGE_LANGUAGE","PROVIDE","AFFIRM","DENY","THANKS","OTHER",
+    "CHANGE_NUMBER","CHANGE_LANGUAGE","PROVIDE","AFFIRM","DENY","THANKS","WAIT","RUDE","HELP","OTHER",
   ]),
   date: z.string().nullable(),            // "YYYY-MM-DD", resolved from relative words using context.today
   time: z.string().nullable(),            // "HH:MM" 24h

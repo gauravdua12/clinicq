@@ -35,7 +35,10 @@ Shown in the welcome message and in HELP:
 | `PROVIDE` | answers to the current question (a time, a name, "6:30", "for my son") | current state's handler |
 | `AFFIRM` / `DENY` | haan, ok, yes / nahi, no | current state's handler |
 | `THANKS` | thank you, dhanyavaad | short warm close |
-| `OTHER` | anything else | gentle help + menu |
+| `WAIT` | hold, wait, ek minute, ruko, baad mein batata hoon | "take your time"; the pending question is kept (not repeated) |
+| `RUDE` | stupid, useless, bakwas, pagal ho kya, "stop it now", "stop repeating" | apology + what I can do + clinic phone, then the pending question (never an unsubscribe) |
+| `HELP` | what can you do, who are you, are you a bot | what I can do, then the pending question or the menu |
+| `OTHER` | anything else | mid-way: "Sorry, I didn't understand" + the question; idle: apology + what I can do + menu |
 Walk-in starts from the QR text pattern `WALKIN <CODE>-<DAILY>` (rule-based, not LLM).
 Flags: `hasNonBookingContent` (health details), `isEmergency` (from the keyword matcher, see §6.9).
 
@@ -296,3 +299,19 @@ Sent from a whitelisted number to the clinic number. Case-insensitive; Hindi ali
 - **In-chat session buttons** show clinic hours: "Morning (10am–1pm)", "Evening (5:10–8pm)".
 - **Booking page "Back to WhatsApp"** uses the WhatsApp app link (`whatsapp://send?phone=`), so iOS doesn't show its Messages / WhatsApp Business chooser. `wa.me` is the fallback.
 - **Rescheduling** also confirms before anything moves: `RS_CONFIRM_ASK` shows From / To with **Confirm change / Change time**. "Change time" leaves the existing booking untouched. A booking where the visit type was already given also confirms first.
+
+## Off-script messages (12 Oct 2026)
+A real patient typed "Stupid", "Hold" and "Stop it now" at the number question and got the same question back each time.
+Rules now, for every state:
+- **Never the same message twice in a row in reply to typed text.** If the bot is about to repeat its last question word for
+  word, it first says it didn't understand (`NOT_UNDERSTOOD`). Apologies, "take your time" and repeated menus rotate their wording.
+- **Answer what was said first, then ask again:** rude → `RUDE_REPLY` (apology, what I can do, clinic phone); help → `HELP_REPLY`;
+  a clinic question → the answer; hello → `HELLO_AGAIN`. At the number question, the reason is given (`NUMBER_WHY`).
+- **"Hold on" keeps the place** (`WAIT_OK`, 30 minutes) and doesn't repeat the question.
+- **Two misses in a row** mid-way → `STUCK_HELP` with [Continue] [Menu] [Call clinic]. At the agreement or number question the
+  second miss adds the clinic phone (`GATE_CALL_ALT`). "No" to the agreement → `CONSENT_DECLINED`.
+- **"Stop"** (unsubscribe) works from any state, including before consent, and drops whatever was in progress. "Stop it now" said in
+  frustration is `RUDE`, not an unsubscribe.
+- Declining data deletion now says `ERASE_KEPT` ("I haven't deleted anything"), not the cancellation text.
+Tested by `apps/server/test/integration/offscript.test.ts`: 20 states × 16 off-script messages (English, Hinglish, Hindi), each
+sent twice, plus live-AI personas u32–u36.
