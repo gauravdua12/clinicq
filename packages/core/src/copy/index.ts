@@ -13,9 +13,9 @@ const DISCLAIMER: Entry = {
 
 export const COPY = {
   WELCOME_CONSENT: {
-    en: `Hello! 👋 ${DISCLAIMER.en}\n\nBefore we start: we save only your name, number and appointment details to manage your visit. Privacy notice: {{noticeUrl}}\n\nIf a chat is left unfinished for 30 minutes, I'll start fresh the next time you message.`,
-    hi: `नमस्ते! 👋 ${DISCLAIMER.hi}\n\nशुरू करने से पहले: आपकी विज़िट के लिए हम केवल नाम, नंबर और अपॉइंटमेंट की जानकारी रखते हैं। प्राइवेसी नोटिस: {{noticeUrl}}\n\nअगर कोई बातचीत 30 मिनट तक अधूरी रहे, तो अगली बार हम नए सिरे से शुरू करेंगे।`,
-    hinglish: `Namaste! 👋 ${DISCLAIMER.hinglish}\n\nShuru karne se pehle: hum sirf aapka naam, number aur appointment details rakhte hain. Privacy notice: {{noticeUrl}}\n\nAgar chat 30 minute tak adhoori rahe, to agli baar hum naye sire se shuru karenge.`,
+    en: `Hello! 👋 ${DISCLAIMER.en}\n\nBefore we start, I need your OK to save your name, WhatsApp number and appointment details. We use them only to book your visits and send reminders, and we never store medical details. India's data-protection law asks us to get your consent first. Privacy notice: {{noticeUrl}}\n\nTap *I agree, continue* to go ahead.\n\nIf a chat is left unfinished for 30 minutes, I'll start fresh the next time you message.`,
+    hi: `नमस्ते! 👋 ${DISCLAIMER.hi}\n\nशुरू करने से पहले मुझे आपका नाम, WhatsApp नंबर और अपॉइंटमेंट की जानकारी रखने के लिए आपकी सहमति चाहिए। इनका इस्तेमाल सिर्फ़ आपकी बुकिंग और रिमाइंडर के लिए होता है, और हम कोई मेडिकल जानकारी नहीं रखते। भारत के डेटा-सुरक्षा कानून के तहत पहले आपकी सहमति लेना ज़रूरी है। प्राइवेसी नोटिस: {{noticeUrl}}\n\nआगे बढ़ने के लिए *सहमत हूँ, आगे बढ़ें* दबाएँ।\n\nअगर कोई बातचीत 30 मिनट तक अधूरी रहे, तो अगली बार हम नए सिरे से शुरू करेंगे।`,
+    hinglish: `Namaste! 👋 ${DISCLAIMER.hinglish}\n\nShuru karne se pehle mujhe aapka naam, WhatsApp number aur appointment details save karne ke liye aapki permission chahiye. Inka use sirf aapki booking aur reminders ke liye hota hai, aur hum koi medical details save nahi karte. India ke data-protection law ke hisaab se pehle aapki consent leni zaroori hai. Privacy notice: {{noticeUrl}}\n\nAage badhne ke liye *Agree, aage badhein* dabaiye.\n\nAgar chat 30 minute tak adhoori rahe, to agli baar hum naye sire se shuru karenge.`,
   },
   CONSENT_DECLINED: {
     en: "No problem. Without this I can't book online, but you're welcome to call the clinic at {{clinicPhone}} 📞.",
@@ -23,9 +23,9 @@ export const COPY = {
     hinglish: "Koi baat nahi. Iske bina main online booking nahi kar sakti, aap clinic ko {{clinicPhone}} par call kar sakte hain 📞.",
   },
   CONSENT_REMINDER: {
-    en: "To book, please tap *I agree* on the message above, or reply \"agree\".",
-    hi: "बुकिंग के लिए ऊपर वाले मैसेज पर *सहमत हूँ* दबाएँ, या \"agree\" लिखें।",
-    hinglish: "Booking ke liye upar wale message par *Agree* dabayein, ya \"agree\" likhein.",
+    en: "To book, I need your OK to save your name, number and appointment details (only for your bookings and reminders). Please tap *I agree, continue*, or reply \"agree\".",
+    hi: "बुकिंग के लिए आपका नाम, नंबर और अपॉइंटमेंट की जानकारी रखने की सहमति चाहिए (सिर्फ़ बुकिंग और रिमाइंडर के लिए)। कृपया *सहमत हूँ, आगे बढ़ें* दबाएँ, या \"agree\" लिखें।",
+    hinglish: "Booking ke liye aapka naam, number aur appointment details save karne ki permission chahiye (sirf booking aur reminders ke liye). Please *Agree, aage badhein* dabaiye, ya \"agree\" likhiye.",
   },
   CONFIRM_NUMBER: {
     en: "Thank you{{nameJi}}. I'll book this with your number {{waPhone}}. Is that okay?",
@@ -193,9 +193,9 @@ export const COPY = {
     hinglish: "Kaunsa appointment cancel karna hai?",
   },
   RS_ASK_WHEN: {
-    en: "No problem. Which day and time would you prefer?",
-    hi: "कोई बात नहीं। आपको कौन सा दिन और समय चाहिए?",
-    hinglish: "Koi baat nahi. Kaunsa din aur time chahiye?",
+    en: "No problem. Which day suits you? Pick one below, or type your preferred day and time (like \"Friday 5 pm\").",
+    hi: "कोई बात नहीं। कौन सा दिन ठीक रहेगा? नीचे से चुनें, या अपना पसंदीदा दिन और समय लिखें (जैसे \"शुक्रवार शाम 5 बजे\")।",
+    hinglish: "Koi baat nahi. Kaunsa din theek rahega? Neeche se chuniye, ya apna pasand ka din aur time likhiye (jaise \"Friday shaam 5 baje\").",
   },
   RS_DONE: {
     en: "Moved ✅ {{name}} ji, {{dayShort}}, {{time}}, Token {{token}}. The {{oldTime}} slot is released.",
@@ -593,6 +593,8 @@ export const BTN = {
   CONFIRM: { en: "Confirm", hi: "कन्फ़र्म", hinglish: "Confirm" },
   CONFIRM_BOOKING: { en: "Confirm booking", hi: "कन्फ़र्म करें", hinglish: "Confirm karein" },
   CHANGE_TIME: { en: "Change time", hi: "समय बदलें", hinglish: "Time badlein" },
+  TODAY: { en: "Today", hi: "आज", hinglish: "Aaj" },
+  TOMORROW: { en: "Tomorrow", hi: "कल", hinglish: "Kal" },
   CONFIRM_CHANGE: { en: "Confirm change", hi: "बदलाव कन्फ़र्म करें", hinglish: "Confirm karein" },
   CONTINUE: { en: "Continue", hi: "जारी रखें", hinglish: "Continue karein" },
   NEW_BOOKING: { en: "New booking", hi: "नई बुकिंग", hinglish: "Nayi booking" },

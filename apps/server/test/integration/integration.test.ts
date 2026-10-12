@@ -611,3 +611,35 @@ describe("always confirm before booking or moving", () => {
     Object.assign(h.ctx.env, { BOOKING_PAGE: true });
   });
 });
+
+describe("reschedule day choice and consent reason", () => {
+  it("reschedule offers today, tomorrow and the next open day in one prompt; a tap shows that day's times", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    await onboard(h);
+    await createProfile(h.ctx, (await h.db.patientAccount.findFirstOrThrow()).id, "Ramesh Kumar", "SELF");
+    await h.say(PATIENT, "book tomorrow 6:10 pm for me");
+    await h.tap(PATIENT, "vt:NEW");
+    await h.tap(PATIENT, "bk:yes");
+    const appt = await h.db.appointment.findFirstOrThrow({ where: { status: "BOOKED" } });
+    await h.tap(PATIENT, `appt:rs:${appt.id}`);
+    const m = h.wa.last(PATIENT);
+    expect(m?.kind === "buttons" && m.body).toMatch(/Pick one below, or type your preferred day and time/);
+    expect(h.buttons(PATIENT).map((b) => b.title)).toEqual(["Today · Fri 9", "Tomorrow · Sat 10", "Mon 12 Oct"]); // Sunday closed
+    await h.tap(PATIENT, "rsday:2026-10-12");
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("OFFER_NEAR_SLOTS");
+    expect(h.buttons(PATIENT)[0]!.id).toMatch(/^slot:2026-10-12\|/);
+    await h.tap(PATIENT, h.buttons(PATIENT)[0]!.id);
+    expect((await h.kinds(PATIENT)).at(-1)).toBe("RS_CONFIRM_ASK"); // still confirmed before moving
+  });
+
+  it("the agreement request says why it's needed", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    await h.say(PATIENT, "Hi");
+    const w = h.wa.last(PATIENT);
+    expect(w?.kind === "buttons" && w.body).toMatch(/I need your OK to save your name, WhatsApp number and appointment details/);
+    expect(w?.kind === "buttons" && w.body).toMatch(/only to book your visits and send reminders/);
+    expect(w?.kind === "buttons" && w.buttons.map((b) => b.title)).toEqual(["I agree, continue"]);
+    await h.say(PATIENT, "book appointment");
+    expect(h.lastText(PATIENT)).toMatch(/need your OK .* \(only for your bookings and reminders\)/);
+  });
+});

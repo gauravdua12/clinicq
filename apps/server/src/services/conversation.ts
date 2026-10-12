@@ -60,7 +60,7 @@ interface Conv {
 const ABANDON_RE = /\b(don'?t|do not|dont)\s+(want|need)\b|\bno need\b|\bnot now\b|\bleave it\b|\bforget it\b|\bnahi?n?\s+(chahiye|karna|karni)\b|\brehne\s+do\b|\bchh?o+d\s*do\b|\bmat\s+karo\b|नहीं\s+चाहिए|रहने\s+दो|छोड़\s+दो|मत\s+करो/i;
 const RESTART_RE = /^\s*(start\s+(over|again|fresh)|restart|reset|new\s+chat|shuru\s+se|phir\s+se\s+shuru|फिर\s+से\s+शुरू|शुरू\s+से)\b/i;
 /** Buttons from a conversation that has since been reset; they no longer carry enough context to continue. */
-const STALE_BUTTON = /^(slot|vt|bk|see_all|sess|who|resume)(:|$)/;
+const STALE_BUTTON = /^(slot|vt|bk|see_all|sess|who|resume|rsday)(:|$)/;
 
 /** "English please", "hindi mein baat karo", "switch to Hinglish" → the language asked for (null if none named). */
 function languageTarget(text: string): Lang | null {
@@ -432,6 +432,7 @@ async function onButton(t: Turn, id: string): Promise<void> {
     case "sess": { const [date, label] = (a ?? "").split("|"); return slotPicker(t, date ?? nowLocal(t.ctx).date, false, label); }
     case "vt": t.conv.p.visitType = a as VisitType; return askConfirm(t);
     case "bk": return a === "yes" ? finalize(t) : a === "stop" ? stopFlow(t, "BOOKING_STOPPED") : changeTime(t);
+    case "rsday": if (!a) return askWhen(t); t.conv.p.date = a; t.conv.p.time = null; t.conv.p.tq = null; t.conv.p.pod = undefined; return offer(t);
     case "lang": return a === "en" || a === "hi" || a === "hinglish" ? setLanguage(t, a) : askLanguage(t);
     case "resume":
       if (a === "go") return resumePrompt(t);
@@ -582,7 +583,19 @@ async function progressBooking(t: Turn): Promise<void> {
 async function askWhen(t: Turn): Promise<void> {
   t.set("BK_WHEN");
   t.conv.raceLost = false;
-  return t.text(t.conv.p.intent === "RESCHEDULE" ? "RS_ASK_WHEN" : "ASK_WHEN");
+  if (t.conv.p.intent !== "RESCHEDULE") return t.text("ASK_WHEN");
+  // Rescheduling: the next three days with free slots (today first) as buttons, or type a preferred day and time.
+  const avail = await windowAvailability(t.ctx, t.info);
+  const today = nowLocal(t.ctx).date;
+  const days: string[] = [];
+  for (let i = 0; i <= t.info.settings.windowDays && days.length < 3; i++) { const d = T.addDays(today, i); if (S.freeSlotsOn(d, avail).length) days.push(d); }
+  if (!days.length) return t.text("RS_ASK_WHEN");
+  const label = (d: string) => {
+    const [wd, day] = T.fmtDayShort(d, t.lang).split(" ");
+    const rel = d === today ? t.b("TODAY") : d === T.addDays(today, 1) ? t.b("TOMORROW") : null;
+    return (rel ? `${rel} · ${wd} ${day}` : T.fmtDayShort(d, t.lang)).slice(0, 20);
+  };
+  return t.buttons(t.t("RS_ASK_WHEN"), "RS_ASK_WHEN", days.map((d) => ({ id: `rsday:${d}`, title: label(d) })));
 }
 
 async function answerWho(t: Turn, e: Extraction): Promise<void> {
