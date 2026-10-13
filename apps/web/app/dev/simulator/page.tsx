@@ -39,10 +39,10 @@ function Phone({ number, name, title }: { number: string; name: string; title: s
   return (
     <div className="card" style={{ width: 380, display: "flex", flexDirection: "column", height: "80vh" }}>
       <div className="row" style={{ justifyContent: "space-between" }}><b>{title}</b><span className="small muted">+{number}</span></div>
-      <div ref={box} style={{ flex: 1, overflowY: "auto", background: "var(--surface-2)", borderRadius: 10, padding: 8, margin: "8px 0" }}>
+      <div ref={box} style={{ flex: 1, overflowY: "auto", background: "var(--card-2)", borderRadius: 10, padding: 8, margin: "8px 0" }}>
         {bubbles.map((b, i) => (
           <div key={i} style={{ display: "flex", justifyContent: b.from === "me" ? "flex-end" : "flex-start", margin: "6px 0" }}>
-            <div style={{ maxWidth: "85%", background: b.from === "me" ? "var(--accent-bg)" : "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "6px 10px", whiteSpace: "pre-wrap", fontSize: 14 }}>
+            <div style={{ maxWidth: "85%", background: b.from === "me" ? "var(--blue-soft)" : "var(--card)", border: "1px solid var(--line)", borderRadius: 10, padding: "6px 10px", whiteSpace: "pre-wrap", fontSize: 14 }}>
               {b.text}
               {b.msg && <Render msg={b.msg} onTap={(id, title) => send({ type: "button", buttonId: id, buttonTitle: title }, `[${title}]`)} />}
             </div>

@@ -30,8 +30,8 @@ export default function Reports() {
           <div key={d} className="row" style={{ gap: 10, margin: "4px 0" }}>
             <span className="small" style={{ width: 90 }}>{d.slice(5)}</span>
             <div style={{ flex: 1, display: "flex", height: 16 }}>
-              <div title={`Booked ${v.booked}`} style={{ width: `${(100 * v.booked) / max}%`, background: "var(--accent)", borderRadius: "4px 0 0 4px" }} />
-              <div title={`Walk-ins ${v.walkins}`} style={{ width: `${(100 * v.walkins) / max}%`, background: "var(--next)", borderRadius: "0 4px 4px 0", marginLeft: 2 }} />
+              <div title={`Booked ${v.booked}`} style={{ width: `${(100 * v.booked) / max}%`, background: "var(--mint)", borderRadius: "4px 0 0 4px" }} />
+              <div title={`Walk-ins ${v.walkins}`} style={{ width: `${(100 * v.walkins) / max}%`, background: "var(--saffron)", borderRadius: "0 4px 4px 0", marginLeft: 2 }} />
             </div>
             <span className="small muted" style={{ width: 90 }}>{v.booked} + {v.walkins}</span>
           </div>

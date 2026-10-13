@@ -1,5 +1,5 @@
 /**
- * User-acceptance run: 36 patient personas talk to the real conversation engine with the LIVE
+ * User-acceptance run: 38 patient personas talk to the real conversation engine with the LIVE
  * language models (Qwen3 32B → Mistral Large 3 on Bedrock Mumbai) and Voxtral for voice.
  * A persona taps buttons like a person would (by label). Results → test-results/uat/.
  *
@@ -102,6 +102,10 @@ const P: Persona[] = [
     check: (r) => expectAll([has(r, "OFF_TOPIC"), "apologises and says what it can do"]) },
   { id: "u36", title: "Gibberish at the number question", steps: [{ say: "Hi" }, { tap: /agree/i }, { say: "asdf qwerty" }, { say: "lkjh poiu" }, { tap: /use/i }],
     check: (r) => expectAll([r.texts.some((t) => /which number to use/i.test(t)), "explains why the number is asked"], [r.texts.some((t) => /call the clinic/i.test(t)), "offers calling the clinic"], [has(r, "MAIN_MENU"), "continues once tapped"]) },
+  { id: "u37", title: "Two bookings, cancels both in Hinglish ('dono')", setup: "self+mother", steps: [{ say: "book me tomorrow 11 am" }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म|Confirm karein/ }, { say: "mummy ke liye monday subah 10:20 book karo" }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म|Confirm karein/ }, { say: "mere saare appointments cancel kar do" }, { say: "haan dono" }],
+    check: (r) => expectAll([has(r, "CX_CONFIRM_MANY"), "lists both bookings in one confirmation"], [has(r, "CX_DONE_MANY"), "cancels both together"], [r.booked.length === 0, "no booking left"]) },
+  { id: "u38", title: "Two bookings, cancels one by number, keeps the other", setup: "self+mother", steps: [{ say: "book me tomorrow 11 am" }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म|Confirm karein/ }, { say: "book for my mother Monday 10:20 am" }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म|Confirm karein/ }, { say: "I want to cancel an appointment" }, { say: "2" }, { tap: /Yes, cancel|Haan, cancel|हाँ, कैंसल/ }, { tap: /that's all|itna hi|इतना ही/i }],
+    check: (r) => expectAll([r.booked.length === 1, "one booking left"], [has(r, "CX_REST_KEPT"), "confirms the rest stay"]) },
 ];
 
 const only = process.argv.includes("--only") ? process.argv[process.argv.indexOf("--only") + 1] : null;

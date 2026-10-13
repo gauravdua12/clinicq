@@ -192,6 +192,16 @@ export const COPY = {
     hi: "आप कौन सा अपॉइंटमेंट कैंसल करना चाहते हैं?",
     hinglish: "Kaunsa appointment cancel karna hai?",
   },
+  CX_PICK_MULTI: {
+    en: "Which appointment would you like to cancel?\n\n{{list}}\n\nTap *Choose* and pick one, or *All of these*. To cancel a few, type their numbers, like \"1 and 3\".",
+    hi: "आप कौन सा अपॉइंटमेंट कैंसल करना चाहते हैं?\n\n{{list}}\n\n*चुनें* दबाकर एक चुनें, या *ये सभी*। कुछ अपॉइंटमेंट एक साथ कैंसल करने के लिए उनके नंबर लिखें, जैसे \"1 और 3\"।",
+    hinglish: "Kaunsa appointment cancel karna hai?\n\n{{list}}\n\n*Chuniye* dabakar ek chuniye, ya *Yeh sabhi*. Ek se zyada cancel karne ke liye unke number likhiye, jaise \"1 aur 3\".",
+  },
+  CX_CONFIRM_MANY: {
+    en: "Cancel these {{n}} appointments?\n{{list}}",
+    hi: "ये {{n}} अपॉइंटमेंट कैंसल करूँ?\n{{list}}",
+    hinglish: "Yeh {{n}} appointments cancel kar doon?\n{{list}}",
+  },
   RS_ASK_WHEN: {
     en: "No problem. Which day suits you? Pick one below, or type your preferred day and time (like \"Friday 5 pm\").",
     hi: "कोई बात नहीं। कौन सा दिन ठीक रहेगा? नीचे से चुनें, या अपना पसंदीदा दिन और समय लिखें (जैसे \"शुक्रवार शाम 5 बजे\")।",
@@ -211,6 +221,31 @@ export const COPY = {
     en: "Cancelled. Hope to see you soon 🙏 Message me anytime to book again.",
     hi: "कैंसल हो गया। जल्द मिलेंगे 🙏 दोबारा बुक करने के लिए कभी भी मैसेज करें।",
     hinglish: "Cancel ho gaya. Jaldi milenge 🙏 Dobara book karne ke liye kabhi bhi message karein.",
+  },
+  CX_DONE_MANY: {
+    en: "Cancelled {{n}} appointments ✅ Hope to see you soon 🙏 Message me anytime to book again.",
+    hi: "{{n}} अपॉइंटमेंट कैंसल हो गए ✅ जल्द मिलेंगे 🙏 दोबारा बुक करने के लिए कभी भी मैसेज करें।",
+    hinglish: "{{n}} appointments cancel ho gaye ✅ Jaldi milenge 🙏 Dobara book karne ke liye kabhi bhi message karein.",
+  },
+  CX_DONE_MORE: {
+    en: "Cancelled ✅ You still have:\n{{list}}\n\nWould you like to cancel another one too?",
+    hi: "कैंसल हो गया ✅ आपके ये अपॉइंटमेंट अभी बाकी हैं:\n{{list}}\n\nक्या एक और कैंसल करना है?",
+    hinglish: "Cancel ho gaya ✅ Aapke yeh appointments abhi baaki hain:\n{{list}}\n\nKya ek aur cancel karna hai?",
+  },
+  CX_DONE_MANY_MORE: {
+    en: "Cancelled {{n}} appointments ✅ You still have:\n{{list}}\n\nWould you like to cancel another one too?",
+    hi: "{{n}} अपॉइंटमेंट कैंसल हो गए ✅ ये अभी बाकी हैं:\n{{list}}\n\nक्या एक और कैंसल करना है?",
+    hinglish: "{{n}} appointments cancel ho gaye ✅ Yeh abhi baaki hain:\n{{list}}\n\nKya ek aur cancel karna hai?",
+  },
+  CX_KEPT_MANY: {
+    en: "Okay, your appointments stay as they are 😊",
+    hi: "ठीक है, आपके अपॉइंटमेंट वैसे ही रहेंगे 😊",
+    hinglish: "Theek hai, aapke appointments waise hi rahenge 😊",
+  },
+  CX_REST_KEPT: {
+    en: "Okay, your other appointments stay as they are 😊",
+    hi: "ठीक है, आपके बाकी अपॉइंटमेंट वैसे ही रहेंगे 😊",
+    hinglish: "Theek hai, aapke baaki appointments waise hi rahenge 😊",
   },
   CX_KEPT: {
     en: "Okay, your appointment stays as it is 😊",
@@ -658,6 +693,12 @@ export const BTN = {
   STOP_BOOKING: { en: "Stop booking", hi: "बुकिंग रोकें", hinglish: "Booking rokein" },
   YES_CANCEL: { en: "Yes, cancel", hi: "हाँ, कैंसल करें", hinglish: "Haan, cancel karo" },
   KEEP_IT: { en: "Keep it", hi: "रहने दें", hinglish: "Rehne do" },
+  KEEP_THEM: { en: "Keep them", hi: "रहने दें", hinglish: "Rehne dein" },
+  YES_CANCEL_ALL: { en: "Yes, cancel all", hi: "हाँ, सब कैंसल करें", hinglish: "Haan, sab cancel" },
+  CANCEL_ANOTHER: { en: "Cancel another", hi: "एक और कैंसल करें", hinglish: "Ek aur cancel karein" },
+  THATS_ALL: { en: "No, that's all", hi: "बस, इतना ही", hinglish: "Bas, itna hi" },
+  CHOOSE: { en: "Choose", hi: "चुनें", hinglish: "Chuniye" },
+  ALL_OF_THESE: { en: "All of these ({{n}})", hi: "ये सभी ({{n}})", hinglish: "Yeh sabhi ({{n}})" },
   TRY_ANOTHER_DAY: { en: "Try another day", hi: "दूसरा दिन", hinglish: "Doosra din" },
   CALL_CLINIC: { en: "Call clinic", hi: "क्लिनिक कॉल करें", hinglish: "Clinic call karein" },
   CHECK_TIMES: { en: "Check times", hi: "समय देखें", hinglish: "Time dekhein" },

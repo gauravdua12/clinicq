@@ -48,6 +48,8 @@ interface Conv {
   held?: string;
   raceLost?: boolean;
   cxApptId?: string;
+  cxIds?: string[]; // several appointments chosen for cancelling together
+  cxList?: string[]; // the appointments shown in the cancel list, in their numbered order
   welcomeSent?: boolean;
   emergencyAt?: number;
   lastOut?: string; // kind of the bot's last message (context for short replies like "sure", "ok")
@@ -75,7 +77,7 @@ function languageTarget(text: string): Lang | null {
 }
 
 /** After these the conversation is complete; a bare "ok / sure / thanks" deserves a polite close, not a menu. */
-const CLOSING = new Set(["BOOKING_CONFIRMED", "CX_DONE", "CX_KEPT", "ERASE_KEPT", "RS_DONE", "REMINDER_CONFIRMED", "STATUS", "STATUS_BOOKED", "STATUS_NEXT", "STATUS_FUTURE",
+const CLOSING = new Set(["BOOKING_CONFIRMED", "CX_DONE", "CX_KEPT", "ERASE_KEPT", "CX_DONE_MANY", "CX_KEPT_MANY", "CX_REST_KEPT", "RS_DONE", "REMINDER_CONFIRMED", "STATUS", "STATUS_BOOKED", "STATUS_NEXT", "STATUS_FUTURE",
   "THANKS_REPLY", "ACK_CLOSING", "MY_DATA", "MY_APPOINTMENTS", "CLINIC_ADDRESS", "CLINIC_FEES", "CLINIC_TIMINGS", "ALT_NUMBER_SAVED", "ARRIVED_OK", "ALREADY_IN_QUEUE",
   "LANGUAGE_SET", "OPTED_IN", "OPTED_OUT", "CALL_CLINIC", "YOUR_TURN"]);
 
@@ -83,7 +85,7 @@ const CLOSING = new Set(["BOOKING_CONFIRMED", "CX_DONE", "CX_KEPT", "ERASE_KEPT"
 const PROMPTS = new Set(["WELCOME_CONSENT", "CONSENT_REMINDER", "CONFIRM_NUMBER", "ASK_ALT_NUMBER", "ALT_NUMBER_INVALID", "ASK_WHO", "ASK_NAME_SELF", "ASK_NAME_OTHER",
   "ASK_WHEN", "RS_ASK_WHEN", "ASK_WHEN_RETRY", "ASK_VISIT_TYPE", "CONFIRM_BOOKING_ASK", "RS_CONFIRM_ASK", "OFFER_NEAR_SLOTS", "SLOT_TAKEN_TYPED", "LIST_PICKER",
   "LIST_PICK_SESSION", "BOOK_LINK", "FLOW_BOOKING", "SAME_SLOT_FAMILY", "SLOT_RACE_DECLINED", "SLOT_RACE_LOST", "WALKIN_ASK_NAME", "WALKIN_CHECKING", "CX_CONFIRM",
-  "ERASE_CONFIRM", "RS_PICK_APPT", "CX_PICK_APPT", "RESUME_PROMPT", "WELCOME_BACK_MIDFLOW", "STUCK_HELP", "LANGUAGE_PICK"]);
+  "ERASE_CONFIRM", "RS_PICK_APPT", "CX_PICK_APPT", "CX_CONFIRM_MANY", "CX_DONE_MORE", "RESUME_PROMPT", "WELCOME_BACK_MIDFLOW", "STUCK_HELP", "LANGUAGE_PICK"]);
 
 const QUESTION: Partial<Record<State, string>> = {
   AWAIT_CONSENT: "agree to the privacy notice?", AWAIT_NUMBER_CONFIRM: "use this number for booking?", AWAIT_ALT_NUMBER: "10-digit mobile number",
@@ -101,6 +103,9 @@ class Turn {
   lead?: string;
   /** This turn answers a typed or spoken message (not a button tap). */
   typed = false;
+  /** The message said "all / both / saare / dono", or "no / nahi" (matched in memory only). */
+  allWord = false;
+  negated = false;
   private sent = 0;
   constructor(public ctx: Ctx, public info: ClinicInfo, public acc: PatientAccount, public waId: string, public conv: Conv, public profiles: ProfileView[]) {}
   get lang(): Lang { return this.conv.lang; }
@@ -263,6 +268,14 @@ async function onText(t: Turn, text: string, isVoice: boolean): Promise<void> {
   const emergencyKw = safety.matchesEmergency(text, t.info.settings.emergencyKeywordsExtra);
   if (emergencyKw) return emergency(t);
   if (RESTART_RE.test(text) && t.conv.state !== "AWAIT_CONSENT") return stopFlow(t, "STARTED_OVER");
+  // "all / both / saare / dono": every upcoming appointment (for cancelling), whatever else the message says.
+  t.negated = /\b(no|nahi|nahin|na|mat|don'?t|not|keep)\b|नहीं|मत/i.test(text);
+  t.allWord = /\b(all|both|saare|sare|saari|sab|sabhi|dono|donon)\b|सब|सभी|सारे|दोनों/i.test(text);
+  // Choosing what to cancel: "2", "1 and 3", "all", "dono" pick from the numbered list.
+  if (t.conv.state === "CX_PICK_APPT" && t.conv.cxList?.length) {
+    const picked = pickFromList(text, t.conv.cxList);
+    if (picked) { text = ""; return picked.length === 1 ? askCancelConfirm(t, picked[0]!) : askCancelMany(t, picked); }
+  }
   const abandon = ABANDON_RE.test(text);
   const langTarget = languageTarget(text);
   // "English please", "hindi mein baat karo", "Hinglish" on its own: a language request even if the model says otherwise.
@@ -315,9 +328,16 @@ async function onText(t: Turn, text: string, isVoice: boolean): Promise<void> {
     case "CHANGE_LANGUAGE": return langTarget ? setLanguage(t, langTarget) : askLanguage(t);
     case "CHANGE_NUMBER": t.set("AWAIT_ALT_NUMBER"); return t.text("CHANGE_NUMBER_INFO");
     case "THANKS": if (t.conv.state === "IDLE" || !t.conv.state.startsWith("BK_")) return t.text("THANKS_REPLY"); break;
-    case "CANCEL": if (t.conv.state !== "CX_CONFIRM" && t.conv.state !== "CX_PICK_APPT") return startCancel(t, e); break;
+    case "CANCEL":
+      if (t.allWord) return cancelAll(t); // "cancel all my appointments", "dono cancel kar do"
+      if (t.conv.state !== "CX_CONFIRM" && t.conv.state !== "CX_PICK_APPT") return startCancel(t, e);
+      break;
     case "RESCHEDULE": return startReschedule(t, e);
     default: break;
+  }
+  if (t.conv.state === "CX_CONFIRM" && t.allWord && !t.negated) {
+    if (t.conv.cxIds?.length) return doCancelMany(t); // "dono" / "all of them" to "cancel these 2?" is a yes
+    return cancelAll(t); // "both" when only one was offered
   }
   // Mid-way through something, a message that answers nothing: say so, and ask again (with a way out after two tries).
   if (t.conv.state !== "IDLE" && e.intent === "OTHER" && !e.hasNonBookingContent && !answersSomething(e)) return notUnderstood(t);
@@ -378,7 +398,7 @@ async function reprompt(t: Turn): Promise<void> {
     case "BK_NAME": return t.text(t.conv.p.forSelf ? "ASK_NAME_SELF" : "ASK_NAME_OTHER");
     case "WALKIN_ASK_NAME": return walkinAsk(t);
     case "WI_AWAIT_STAFF": return t.text("WALKIN_CHECKING", { name: currentName(t) ?? "" });
-    case "CX_CONFIRM": return t.conv.cxApptId ? askCancelConfirm(t, t.conv.cxApptId) : stopFlow(t, "MAIN_MENU");
+    case "CX_CONFIRM": return t.conv.cxIds?.length ? askCancelMany(t, t.conv.cxIds) : t.conv.cxApptId ? askCancelConfirm(t, t.conv.cxApptId) : stopFlow(t, "MAIN_MENU");
     case "ERASE_CONFIRM": return t.buttons(t.t("ERASE_CONFIRM"), "ERASE_CONFIRM", [{ id: "erase:yes", title: t.b("YES_DELETE") }, { id: "erase:no", title: t.b("KEEP_IT") }]);
     case "RS_PICK_APPT": return startReschedule(t, null);
     case "CX_PICK_APPT": return startCancel(t, null);
@@ -420,8 +440,9 @@ async function onState(t: Turn, e: Extraction): Promise<void> {
       if (e.intent === "DENY") return askWhen(t);
       return answerPick(t, e);
     case "CX_CONFIRM":
+      if (e.intent === "AFFIRM" && t.conv.cxIds?.length) return doCancelMany(t);
       if (e.intent === "AFFIRM" && t.conv.cxApptId) return doCancel(t, t.conv.cxApptId);
-      if (e.intent === "DENY") { t.set("IDLE"); return t.text("CX_KEPT"); }
+      if (e.intent === "DENY") { const many = !!t.conv.cxIds?.length; t.conv.cxIds = undefined; t.set("IDLE"); return t.text(many ? "CX_KEPT_MANY" : "CX_KEPT"); }
       return t.buttons(t.t("OTHER_HELP"), "CX_CONFIRM", cxButtons(t));
     case "ERASE_CONFIRM":
       if (e.intent === "AFFIRM") return erase(t);
@@ -575,11 +596,17 @@ async function onButton(t: Turn, id: string): Promise<void> {
       if (a === "ok") return t.text("REMINDER_CONFIRMED");
       if (a === "late") return t.text("REMINDER_CONFIRMED");
       if (a === "rs" && b) return beginReschedule(t, b, null);
-      if (a === "cx" && b) return askCancelConfirm(t, b);
+      if (a === "cx" && b) return startCancel(t, null, b); // shows all upcoming appointments when there are several
       return myAppointments(t);
-    case "cx": if (a === "yes" && b) return doCancel(t, b); t.set("IDLE"); return t.text("CX_KEPT");
+    case "cx":
+      if (a === "yes" && b) return doCancel(t, b);
+      if (a === "many") return doCancelMany(t);
+      if (a === "more") return startCancel(t, null);
+      t.set("IDLE");
+      if (a === "done") return t.text("CX_REST_KEPT");
+      { const many = !!t.conv.cxIds?.length; t.conv.cxIds = undefined; return t.text(many ? "CX_KEPT_MANY" : "CX_KEPT"); }
     case "rs": return beginReschedule(t, a!, null);
-    case "cxp": return askCancelConfirm(t, a!);
+    case "cxp": return a === "all" ? askCancelMany(t, t.conv.cxList ?? []) : askCancelConfirm(t, a!);
     case "erase": if (a === "yes") return erase(t); t.set("IDLE"); return t.text("ERASE_KEPT");
     case "race": return a === "another" ? askWhen(t) : callClinic(t);
     case "call": return callClinic(t);
@@ -1086,7 +1113,7 @@ async function startReschedule(t: Turn, e: Extraction | null): Promise<void> {
   if (!up.length) { t.set("IDLE"); return t.buttons(t.t("NO_UPCOMING"), "NO_UPCOMING", [{ id: "menu:book", title: t.b("BOOK") }]); }
   if (up.length === 1) return beginReschedule(t, up[0]!.id, e);
   t.set("RS_PICK_APPT");
-  { await t.send({ kind: "list", body: t.t("RS_PICK_APPT"), button: t.b("MY_APPTS"), sections: [{ title: "Appointments", rows: up.slice(0, 10).map((u) => ({ id: `rs:${u.id}`, title: fmtAppt(t, u).slice(0, 24) })) }] }, "RS_PICK_APPT"); return; }
+  { await t.send({ kind: "list", body: t.t("RS_PICK_APPT"), button: t.b("MY_APPTS"), sections: [{ title: "Appointments", rows: up.slice(0, 10).map((u) => ({ id: `rs:${u.id}`, title: apptWhen(t, u).slice(0, 24), description: `${firstName(u.profileName)}${u.token ? ` · ${u.token}` : ""}`.slice(0, 72) })) }] }, "RS_PICK_APPT"); return; }
 }
 
 async function beginReschedule(t: Turn, apptId: string, e: Extraction | null): Promise<void> {
@@ -1106,29 +1133,98 @@ function cxButtons(t: Turn): Button[] {
   return [{ id: `cx:yes:${t.conv.cxApptId}`, title: t.b("YES_CANCEL") }, { id: "cx:no", title: t.b("KEEP_IT") }];
 }
 
-async function startCancel(t: Turn, e: Extraction | null): Promise<void> {
-  const up = filterUpcoming(t, await upcomingForAccount(t.ctx, t.acc.id), e);
+/** Every upcoming appointment (or the ones the message points to), numbered, to cancel one, several or all. */
+async function startCancel(t: Turn, e: Extraction | null, tapped?: string): Promise<void> {
+  // "my appointment" doesn't narrow it to the patient's own booking: family bookings are listed too. A named person or day does.
+  const self = t.profiles.find((x) => x.relation === "SELF")?.ref;
+  const up = filterUpcoming(t, await upcomingForAccount(t.ctx, t.acc.id), e && e.profileRef === self ? { ...e, profileRef: null } : e);
   if (!up.length) { t.set("IDLE"); return t.buttons(t.t("NO_UPCOMING"), "NO_UPCOMING", [{ id: "menu:book", title: t.b("BOOK") }]); }
-  if (up.length === 1) return askCancelConfirm(t, up[0]!.id);
+  if (up.length === 1) return askCancelConfirm(t, tapped ?? up[0]!.id);
+  const shown = up.slice(0, 9); // a WhatsApp list holds 10 rows: 9 appointments + "All of these"
+  t.conv.cxList = shown.map((u) => u.id);
+  t.conv.cxIds = undefined;
+  t.conv.cxApptId = undefined;
   t.set("CX_PICK_APPT");
-  { await t.send({ kind: "list", body: t.t("CX_PICK_APPT"), button: t.b("MY_APPTS"), sections: [{ title: "Appointments", rows: up.slice(0, 10).map((u) => ({ id: `cxp:${u.id}`, title: fmtAppt(t, u).slice(0, 24) })) }] }, "CX_PICK_APPT"); return; }
+  const list = shown.map((u, i) => `${i + 1}. ${fmtAppt(t, u)}${u.token ? ` (${u.token})` : ""}`).join("\n");
+  const rows = shown.map((u, i) => ({ id: `cxp:${u.id}`, title: `${i + 1}. ${apptWhen(t, u)}`.slice(0, 24), description: `${firstName(u.profileName)}${u.token ? ` · ${u.token}` : ""}`.slice(0, 72) }));
+  rows.push({ id: "cxp:all", title: t.b("ALL_OF_THESE", { n: shown.length }), description: "" });
+  await t.send({ kind: "list", body: t.t("CX_PICK_MULTI", { list }), button: t.b("CHOOSE"), sections: [{ title: "Appointments", rows: rows.map((r) => (r.description ? r : { id: r.id, title: r.title })) }] }, "CX_PICK_APPT");
+}
+
+/** "Mon 12 Oct, 6:10 PM": fits a list row (24 characters), with the patient's name below it. */
+function apptWhen(t: Turn, u: UpcomingView): string {
+  return `${T.fmtDayShort(T.localDate(u.slotStart, t.ctx.tz), t.lang)}, ${T.fmtTime(T.localMinutes(u.slotStart, t.ctx.tz))}`;
+}
+
+/** "2", "1 and 3", "1,2", "first and third", "all", "dono" → those appointments from the numbered list (null if it isn't a pick). */
+function pickFromList(text: string, ids: string[]): string[] | null {
+  const s = text.toLowerCase().trim();
+  if (/^(\s*(cancel|karo|kar|do|please|pls|them|these|the|appointments?|wale|wala)\s*)*(all|all of (them|these)|both|sab|sabhi|saare|sare|dono|सब|सभी|दोनों)(\s*(of them|cancel|karo|kar do|please|pls|wale|appointments?))*\s*$/.test(s)) return [...ids];
+  const ORD: Record<string, number> = { first: 1, "1st": 1, pehla: 1, pehle: 1, pahla: 1, second: 2, "2nd": 2, doosra: 2, dusra: 2, third: 3, "3rd": 3, teesra: 3, fourth: 4, "4th": 4, fifth: 5, "5th": 5 };
+  const words = s.replace(/[,&+.#]/g, " ").split(/\s+/).filter(Boolean);
+  const nums: number[] = [];
+  for (const w of words) {
+    if (/^\d{1,2}$/.test(w)) nums.push(Number(w));
+    else if (ORD[w]) nums.push(ORD[w]);
+    else if (!/^(and|aur|or|cancel|karo|kar|do|please|pls|number|numbers|no|nos|wala|wale|ko|appointment|appointments|the|one|ones|ki|ka)$/.test(w)) return null; // other words: not a pick
+  }
+  if (!nums.length || nums.some((x) => x < 1 || x > ids.length)) return null;
+  return [...new Set(nums)].map((x) => ids[x - 1]!);
 }
 
 async function askCancelConfirm(t: Turn, apptId: string): Promise<void> {
   const a = await t.ctx.db.appointment.findUnique({ where: { id: apptId }, include: { profile: true } });
   if (!a || a.profile?.accountId !== t.acc.id || !["BOOKED", "ARRIVED"].includes(a.status)) return myAppointments(t);
   t.conv.cxApptId = a.id;
+  t.conv.cxIds = undefined;
   t.set("CX_CONFIRM");
   return t.buttons(t.t("CX_CONFIRM", { name: firstName(decrypt(a.profile!.name)), dayShort: T.fmtDayShort(T.localDate(a.slotStart, t.ctx.tz), t.lang), time: T.fmtTime(T.localMinutes(a.slotStart, t.ctx.tz)) }), "CX_CONFIRM", cxButtons(t));
+}
+
+/** "Cancel all": every upcoming appointment, one confirmation. */
+async function cancelAll(t: Turn): Promise<void> {
+  const up = await upcomingForAccount(t.ctx, t.acc.id);
+  if (!up.length) { t.set("IDLE"); return t.buttons(t.t("NO_UPCOMING"), "NO_UPCOMING", [{ id: "menu:book", title: t.b("BOOK") }]); }
+  return up.length === 1 ? askCancelConfirm(t, up[0]!.id) : askCancelMany(t, up.map((u) => u.id));
+}
+
+/** Several appointments chosen: one confirmation for all of them. */
+async function askCancelMany(t: Turn, ids: string[]): Promise<void> {
+  const up = (await upcomingForAccount(t.ctx, t.acc.id)).filter((u) => ids.includes(u.id));
+  if (!up.length) return startCancel(t, null);
+  if (up.length === 1) return askCancelConfirm(t, up[0]!.id);
+  t.conv.cxIds = up.map((u) => u.id);
+  t.conv.cxApptId = undefined;
+  t.set("CX_CONFIRM");
+  return t.buttons(t.t("CX_CONFIRM_MANY", { n: up.length, list: up.map((u) => `• ${fmtAppt(t, u)}`).join("\n") }), "CX_CONFIRM_MANY",
+    [{ id: "cx:many", title: t.b("YES_CANCEL_ALL") }, { id: "cx:no", title: t.b("KEEP_THEM") }]);
 }
 
 async function doCancel(t: Turn, apptId: string): Promise<void> {
   const a = await t.ctx.db.appointment.findUnique({ where: { id: apptId }, include: { profile: true } });
   if (!a || a.profile?.accountId !== t.acc.id) return myAppointments(t);
   if (["BOOKED", "ARRIVED", "HELD"].includes(a.status)) await cancelAppointment(t.ctx, apptId, "PATIENT", t.acc.id);
+  return cancelled(t, 1);
+}
+
+async function doCancelMany(t: Turn): Promise<void> {
+  const ids = t.conv.cxIds ?? [];
+  const mine = await t.ctx.db.appointment.findMany({ where: { id: { in: ids }, profile: { accountId: t.acc.id }, status: { in: ["BOOKED", "ARRIVED", "HELD"] } } });
+  if (!mine.length) { t.conv.cxIds = undefined; return myAppointments(t); }
+  for (const a of mine) await cancelAppointment(t.ctx, a.id, "PATIENT", t.acc.id);
+  return cancelled(t, mine.length);
+}
+
+/** After cancelling: say so, and if other bookings remain, offer to cancel another. */
+async function cancelled(t: Turn, n: number): Promise<void> {
   t.conv.cxApptId = undefined;
+  t.conv.cxIds = undefined;
+  t.conv.cxList = undefined;
   t.set("IDLE");
-  return t.text("CX_DONE");
+  const rest = await upcomingForAccount(t.ctx, t.acc.id);
+  if (!rest.length) return n > 1 ? t.text("CX_DONE_MANY", { n }) : t.text("CX_DONE");
+  return t.buttons(t.t(n > 1 ? "CX_DONE_MANY_MORE" : "CX_DONE_MORE", { n, list: rest.map((u) => `• ${fmtAppt(t, u)}`).join("\n") }), "CX_DONE_MORE",
+    [{ id: "cx:more", title: t.b("CANCEL_ANOTHER") }, { id: "cx:done", title: t.b("THATS_ALL") }]);
 }
 
 async function myAppointments(t: Turn): Promise<void> {

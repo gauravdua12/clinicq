@@ -161,7 +161,7 @@ function ClosuresTab() {
       {s.state.ok && <div className="ok">{s.state.ok}</div>}{s.state.err && <div className="err">{s.state.err}</div>}
       <h2 style={{ marginTop: 18 }}>Upcoming closures</h2>
       {rows.length === 0 && <p className="muted small">None</p>}
-      {rows.map((r) => <div key={r.id} className="row" style={{ justifyContent: "space-between", borderBottom: "1px solid var(--border)", padding: "6px 0" }}><span>{r.date.slice(0, 10)} · {r.label ?? "Closed"}{r.sessionId ? " (one session)" : ""}</span><button className="ghost warn" onClick={async () => { await api(`/api/settings/closures/${r.id}`, { method: "DELETE" }); void load(); }}>Remove</button></div>)}
+      {rows.map((r) => <div key={r.id} className="row" style={{ justifyContent: "space-between", borderBottom: "1px solid var(--line)", padding: "6px 0" }}><span>{r.date.slice(0, 10)} · {r.label ?? "Closed"}{r.sessionId ? " (one session)" : ""}</span><button className="ghost warn" onClick={async () => { await api(`/api/settings/closures/${r.id}`, { method: "DELETE" }); void load(); }}>Remove</button></div>)}
     </div>
   );
 }

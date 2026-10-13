@@ -166,3 +166,16 @@ Found and fixed by the matrix besides the reported problem:
 
 Checked and not a bug: the "turn is near" alert said ~45 min and the status reply ~30 min only because the demo recording moved the
 clock 13 minutes between them; a new test confirms both give the same wait at the same moment.
+
+## Update: 13 Oct 2026 (cancel several appointments, reports colours)
+| Layer | Result |
+|---|---|
+| Automated (unit, integration, e2e, data boundary, off-script matrix) | ✅ 161/161 (new: `cancel-many.test.ts`, 12 cases) |
+| UI in real Chrome | ✅ 12/12 |
+| User-level, live AI | ✅ 38/38 (new u37 "mere saare appointments cancel kar do" → "haan dono"; u38 cancel one by number, keep the other) |
+
+Fixed along the way:
+- Reports: the daily bars used colour variables that no longer existed, so they were invisible; booked is green and walk-ins amber, as the legend says.
+- Settings (closures list divider) and the dev simulator used the same missing variables.
+- Appointment lists for reschedule/cancel cut the time off ("…6:1"): rows now show the date and time, with the name underneath.
+- Live AI found: "cancel all my appointments" only offered the patient's own booking, and "dono" at a single-booking confirmation cancelled just that one.

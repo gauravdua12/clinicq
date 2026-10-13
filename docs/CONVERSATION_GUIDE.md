@@ -47,7 +47,7 @@ Flags: `hasNonBookingContent` (health details), `isEmergency` (from the keyword 
 NEW ─▶ AWAIT_CONSENT ─▶ AWAIT_NUMBER_CONFIRM ─▶ (AWAIT_ALT_NUMBER) ─▶ IDLE
 IDLE ─BOOK▶ BK_WHO ─▶ (BK_NAME) ─▶ BK_WHEN ─▶ BK_PICK_SLOT ─▶ (BK_FLOW_OPEN) ─▶ BK_VISIT_TYPE ─▶ (BK_PAYMENT) ─▶ IDLE
 IDLE ─RESCHEDULE▶ RS_PICK_APPT ─▶ BK_WHEN … ─▶ IDLE
-IDLE ─CANCEL▶ CX_PICK_APPT ─▶ CX_CONFIRM ─▶ IDLE
+IDLE ─CANCEL▶ CX_PICK_APPT (2+ bookings) ─▶ CX_CONFIRM (one) / CX_CONFIRM_MANY (several) ─▶ IDLE
 IDLE ─WALKIN code▶ (number/name) ─▶ WI_ISSUE | WI_AWAIT_STAFF ─▶ IDLE | BK_PICK_SLOT
 IDLE ─DELETE_DATA▶ ERASE_CONFIRM ─▶ IDLE
 ```
@@ -315,3 +315,14 @@ Rules now, for every state:
 - Declining data deletion now says `ERASE_KEPT` ("I haven't deleted anything"), not the cancellation text.
 Tested by `apps/server/test/integration/offscript.test.ts`: 20 states × 16 off-script messages (English, Hinglish, Hindi), each
 sent twice, plus live-AI personas u32–u36.
+
+## Cancelling several appointments (13 Oct 2026)
+- "Cancel" (typed, or the Cancel button on a confirmation or reminder) with **two or more** upcoming bookings lists all of them,
+  numbered (`CX_PICK_MULTI`), as a WhatsApp list: one row per booking (date and time; name and token below) plus **All of these (N)**.
+  Family bookings are included; a named person ("mummy ka") or day narrows the list.
+- Pick one → `CX_CONFIRM` as before. Pick **All of these**, or type numbers ("1 and 3", "2,3", "first and third") or "all / both /
+  dono / saare" → one confirmation for those (`CX_CONFIRM_MANY`: [Yes, cancel all] [Keep them]). "Cancel all my appointments" goes
+  straight to that confirmation. A typed "dono" / "all" at the confirmation counts as yes; "nahi" keeps them.
+- After a cancellation, if other bookings remain: `CX_DONE_MORE` lists them with [Cancel another] [No, that's all]. With one
+  booking, cancelling works exactly as before.
+- Typed numbers are matched in memory only; the state keeps the listed appointment IDs (`cxList`) and the chosen ones (`cxIds`).
