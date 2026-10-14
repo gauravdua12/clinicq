@@ -128,7 +128,10 @@ class Turn {
   b(id: C.BtnId, vars: C.Vars = {}): string { return C.btn(id, this.lang, vars); }
   baseVars(): C.Vars {
     const c = this.info.clinic;
-    return { clinicName: c.name, clinicPhone: c.phone, noticeUrl: c.noticeUrl, grievanceEmail: this.ctx.env.GRIEVANCE_EMAIL, addressShort: c.addressShort, address: c.addressFull, mapsLine: mapsLine(this.info), sessionHours: sessionHours(this.info), sessionsText: sessionsText(this.info), doctor: this.info.doctor.displayName };
+    // The privacy policy link patients see: the clinic's own if it set a public one, else ClinicQ's (never a localhost address).
+    const ownNotice = c.noticeUrl && /^https:\/\//.test(c.noticeUrl) && !/localhost|127\.0\.0\.1/.test(c.noticeUrl) ? c.noticeUrl : null;
+    const noticeUrl = ownNotice ?? `${this.ctx.env.PUBLIC_BASE_URL}${this.ctx.env.BASE_PATH}/privacy`;
+    return { clinicName: c.name, clinicPhone: c.phone, noticeUrl, grievanceEmail: this.ctx.env.GRIEVANCE_EMAIL, addressShort: c.addressShort, address: c.addressFull, mapsLine: mapsLine(this.info), sessionHours: sessionHours(this.info), sessionsText: sessionsText(this.info), doctor: this.info.doctor.displayName };
   }
   nameJi(name?: string | null): string {
     if (!name) return "";

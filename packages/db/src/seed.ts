@@ -17,7 +17,7 @@ export async function seed(db: Db, opts: { displayKey?: string; slotMinutes?: nu
     data: {
       name: "Dr. Sharma's Clinic", addressShort: "Sector 15, Gurugram", addressFull: "SCO 21, Sector 15 Market, Gurugram, Haryana 122001",
       mapsUrl: "https://maps.app.goo.gl/example", phone: "+91 11 4000 1234", code: SEED.clinicCode, noticeUrl: "http://localhost:8080/privacy",
-      grievanceContact: { name: "Dr. A. Sharma", email: "privacy@example.in", phone: "+91 11 4000 1234" },
+      grievanceContact: { name: "Grievance Officer, Incolo Systems (ClinicQ)", email: "customercare@incolosystems.com", phone: "+91 11 4000 1234" },
       settings: { fees: "₹600 (follow-up within 7 days ₹300)" },
       displayKey: opts.displayKey ?? randomBytes(18).toString("base64url"),
     },
