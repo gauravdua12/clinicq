@@ -42,6 +42,9 @@ export const EnvSchema = z.object({
   DEMO_STUDIO: bool.default(false),
   WA_DISPLAY_NUMBER: z.string().default(""), // the WhatsApp number patients message, e.g. 919920323832
   DEMO_PRESENTER_PHONES: z.string().default(""),
+  // Meta App Review: a made-up staff number whose login code is fixed (never sent on WhatsApp). Empty code = switched off.
+  REVIEWER_PHONE: z.string().default(""),
+  REVIEWER_CODE: z.string().regex(/^(\d{6})?$/, "REVIEWER_CODE must be 6 digits").default(""),
   GRIEVANCE_OFFICER: z.string().default("Gaurav Dua"), // named on the policy pages and in the "privacy" reply (IT Rules 2011, rule 5(9))
   GRIEVANCE_EMAIL: z.string().email().default("customercare@incolosystems.com"), // privacy questions and complaints (policy pages, "privacy" in chat)
   INCOLO_ADMIN_PHONES: z.string().default(""), // Incolo's internal admins: language model settings, Demo Studio (never clinic staff)

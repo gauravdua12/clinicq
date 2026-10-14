@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { copy } from "@clinicq/core";
-import { decrypt, normalizeIndianPhone, phoneHash, type StaffUser } from "@clinicq/db";
+import { decrypt, encrypt, normalizeIndianPhone, phoneHash, type StaffUser } from "@clinicq/db";
 import type { Ctx } from "../context";
 import { sendTo } from "../services/notify";
 
@@ -42,6 +42,29 @@ export async function requireIncoloAdmin(ctx: Ctx, req: FastifyRequest, reply: F
   return s;
 }
 
+/** The Meta App Review login (REVIEWER_PHONE + REVIEWER_CODE), or null when it's switched off. */
+function reviewer(ctx: Ctx): { wa: string; code: string } | null {
+  const wa = normalizeIndianPhone(ctx.env.REVIEWER_PHONE);
+  return wa && ctx.env.REVIEWER_CODE ? { wa, code: ctx.env.REVIEWER_CODE } : null;
+}
+
+/**
+ * At boot: the reviewer's staff account in the active clinic (role STAFF, never on duty, never an Incolo admin), or, when
+ * the reviewer login is switched off, that account deactivated.
+ */
+export async function ensureReviewer(ctx: Ctx): Promise<void> {
+  const r = reviewer(ctx);
+  const wa = normalizeIndianPhone(ctx.env.REVIEWER_PHONE);
+  if (!r) { if (wa) await ctx.db.staffUser.updateMany({ where: { phoneHash: phoneHash(wa) }, data: { active: false } }); return; }
+  const { clinicInfo } = await import("../services/clinic");
+  const { clinic } = await clinicInfo(ctx);
+  await ctx.db.staffUser.upsert({
+    where: { phoneHash: phoneHash(r.wa) },
+    create: { clinicId: clinic.id, name: "App Reviewer", waPhone: encrypt(r.wa), phoneHash: phoneHash(r.wa), role: "STAFF", onDuty: false },
+    update: { active: true, onDuty: false, role: "STAFF" },
+  });
+}
+
 async function startSession(ctx: Ctx, reply: FastifyReply, staffId: string): Promise<void> {
   const sid = randomBytes(32).toString("base64url");
   await ctx.db.staffSession.create({ data: { id: sha(sid), staffId, expiresAt: new Date(ctx.clock.now().getTime() + SESSION_HOURS * 3600_000) } });
@@ -56,8 +79,11 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> 
     if (!staff?.active) return { ok: true }; // no enumeration
     const recent = await ctx.db.otpChallenge.findUnique({ where: { phoneHash: staff.phoneHash } });
     if (recent && recent.expiresAt.getTime() - ctx.clock.now().getTime() > 4 * 60_000) return { ok: true }; // throttle: 1/min
-    const code = String(randomInt(100000, 1000000));
+    // The App Review login: its fixed code is checked like any other, and nothing is sent on WhatsApp.
+    const rv = reviewer(ctx);
+    const code = rv && rv.wa === wa ? rv.code : String(randomInt(100000, 1000000));
     await ctx.db.otpChallenge.upsert({ where: { phoneHash: staff.phoneHash }, create: { phoneHash: staff.phoneHash, codeHash: sha(code), expiresAt: new Date(ctx.clock.now().getTime() + 5 * 60_000) }, update: { codeHash: sha(code), attempts: 0, expiresAt: new Date(ctx.clock.now().getTime() + 5 * 60_000) } });
+    if (rv && rv.wa === wa) return { ok: true };
     const to = decrypt(staff.waPhone);
     const sent = await sendTo(ctx, to, { kind: "template", name: "staff_login_otp", lang: "en", bodyParams: [code], otpCode: code }, { kind: "staff_login_otp" });
     // Until Meta approves the authentication template, a plain message still works if this person messaged the bot in the last 24 h.
