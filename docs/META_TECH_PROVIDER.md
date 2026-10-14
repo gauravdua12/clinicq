@@ -59,4 +59,4 @@ company website and use those URLs.
 
 ## What still needs a person
 - Business verification documents, domain verification, and recording the screencasts.
-- Grievance Officer's name (optional but recommended: India's IT Rules ask for the officer's name) and the registered address of Incolo Systems, if you want them on the policy.
+- Grievance Officer: Gaurav Dua (named on the policy, data deletion page and the WhatsApp "privacy" reply). Registered address of Incolo Systems: optional, add it if you want it on the policy.

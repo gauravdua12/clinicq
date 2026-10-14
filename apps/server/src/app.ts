@@ -69,9 +69,9 @@ export async function buildApp(opts: BuildOpts): Promise<{ app: FastifyInstance;
       return { ok: dbOk, db: dbOk };
     });
     // Public policy pages (linked from WhatsApp and from the Meta app settings): no login, cacheable.
-    scope.get("/privacy", async (_req, reply) => reply.type("text/html").header("cache-control", "public, max-age=300").send(policyHtml("privacy.html", env.GRIEVANCE_EMAIL)));
-    scope.get("/data-deletion", async (_req, reply) => reply.type("text/html").header("cache-control", "public, max-age=300").send(policyHtml("data-deletion.html", env.GRIEVANCE_EMAIL)));
-    scope.get("/terms", async (_req, reply) => reply.type("text/html").header("cache-control", "public, max-age=300").send(policyHtml("terms.html", env.GRIEVANCE_EMAIL)));
+    scope.get("/privacy", async (_req, reply) => reply.type("text/html").header("cache-control", "public, max-age=300").send(policyHtml("privacy.html", env)));
+    scope.get("/data-deletion", async (_req, reply) => reply.type("text/html").header("cache-control", "public, max-age=300").send(policyHtml("data-deletion.html", env)));
+    scope.get("/terms", async (_req, reply) => reply.type("text/html").header("cache-control", "public, max-age=300").send(policyHtml("terms.html", env)));
 
     await webhookRoutes(scope, ctx);
     await flowRoutes(scope, ctx);
@@ -105,8 +105,8 @@ export async function buildApp(opts: BuildOpts): Promise<{ app: FastifyInstance;
   return { app, ctx, ai };
 }
 
-function policyHtml(file: "privacy.html" | "data-deletion.html" | "terms.html", grievanceEmail: string): string {
+function policyHtml(file: "privacy.html" | "data-deletion.html" | "terms.html", env: { GRIEVANCE_EMAIL: string; GRIEVANCE_OFFICER: string }): string {
   const here = dirname(fileURLToPath(import.meta.url));
   const p = join(here, file);
-  return (existsSync(p) ? readFileSync(p, "utf8") : "<h1>ClinicQ Privacy Policy</h1>").replaceAll("{{grievanceEmail}}", grievanceEmail);
+  return (existsSync(p) ? readFileSync(p, "utf8") : "<h1>ClinicQ Privacy Policy</h1>").replaceAll("{{grievanceEmail}}", env.GRIEVANCE_EMAIL).replaceAll("{{grievanceOfficer}}", env.GRIEVANCE_OFFICER);
 }
