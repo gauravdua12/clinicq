@@ -11,7 +11,7 @@ Order matters: business verification → app settings → App Review → Access 
 ## 2. App settings (developers.facebook.com → App 2655971144875702 → App settings → Basic)
 | Field | Value |
 |---|---|
-| App name | ClinicQ (no "WhatsApp" or other Meta trademarks) |
+| App name | ClinicQ by Incolo Systems (must match the policy pages; no "WhatsApp" or other Meta trademarks) |
 | App icon (1024×1024) | `brand/clinicq-app-icon-1024.png` (transparent notches) or `brand/clinicq-app-icon-1024-opaque.png` |
 | Contact email | customercare@incolosystems.com |
 | Privacy Policy URL | https://q.incolo.si/privacy |
@@ -36,6 +36,12 @@ Request **advanced access** for `whatsapp_business_messaging` and `whatsapp_busi
 1. WhatsApp Manager → Message templates → Create template → Utility → name `appointment_confirmed`.
 2. Paste the body from `packages/wa/src/templateText.ts`, add the sample values, submit; show it in the list as "In review/Approved".
 (Alternatively record `npm run meta -- templates` submitting ClinicQ's templates through the API and the result in WhatsApp Manager.)
+
+**Allowed usage answers (paste):**
+- Business Description: *Incolo Systems builds ClinicQ, a WhatsApp appointment and token-queue assistant that doctors' clinics in India use on their own WhatsApp Business numbers.*
+- `whatsapp_business_messaging`: *ClinicQ uses whatsapp_business_messaging to send and receive WhatsApp messages for each clinic that connects its own WhatsApp Business Account. When a patient messages the clinic, ClinicQ replies so they can book, reschedule or cancel an appointment and check their place in the queue. It also sends utility messages the patient has set in motion: booking confirmations, appointment reminders and "your turn is near" updates, and sends clinic staff their login codes and walk-in alerts. ClinicQ sends no marketing or promotional messages. Message text, voice notes and media are only processed to understand the booking request and are never stored.*
+- `whatsapp_business_management`: *ClinicQ uses whatsapp_business_management to manage the WhatsApp Business Accounts that clinics connect to it: reading the phone number's details (display number, verified name, quality rating), subscribing our app to the account's webhooks, and creating and checking the clinic's utility message templates (booking confirmation, appointment reminders, queue updates) in English and Hindi, and the authentication template for staff login codes. We use this access only to run ClinicQ for that clinic.*
+- `public_profile`: *ClinicQ uses public_profile only through Facebook Login for Business, when a clinic administrator connects their WhatsApp Business Account with Embedded Signup. We use the person's name and ID only to record who connected the clinic's account, and for nothing else.*
 
 **Reviewer notes (paste):**
 > We are applying to become a WhatsApp Tech Provider. ClinicQ is an appointment and token-queue assistant for doctors' clinics in India. Each clinic connects its own WhatsApp Business Account through Embedded Signup. ClinicQ answers patients who message the clinic (booking, reminders, queue status) and sends only utility messages the patient or clinic set in motion; no marketing. We use `whatsapp_business_messaging` to send and receive these messages and `whatsapp_business_management` to read the clinic's phone number details and create its utility message templates. Patients' message text, voice notes and media are never stored; only appointment logistics are kept. Test login: [give a staff test number and the OTP instructions].
