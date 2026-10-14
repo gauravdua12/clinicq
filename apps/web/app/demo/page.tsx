@@ -38,7 +38,7 @@ export default function DemoStudio() {
   if (off) return <Shell active="/demo"><div className="empty">Demo Studio is turned off on this server (DEMO_STUDIO=false).</div></Shell>;
 
   return (
-    <Shell active="/demo" title="Show ClinicQ to a prospect in two minutes">
+    <Shell active="/demo" title="Show Q-Incolo to a prospect in two minutes">
       <div className="grid2" style={{ alignItems: "start" }}>
         <section className="card">
           <h2>New demo</h2>

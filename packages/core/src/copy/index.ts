@@ -449,9 +449,9 @@ export const COPY = {
     hinglish: "Sorry, aapke pichhle message ka reply nahi de paaye 🙏 Please apni request dobara bhejein, main turant help karunga.",
   },
   STAFF_OTP_TEXT: {
-    en: "{{code}} is your ClinicQ login code. It expires in 5 minutes. Don't share it with anyone.",
-    hi: "{{code}} आपका ClinicQ लॉगिन कोड है। यह 5 मिनट में समाप्त हो जाएगा। इसे किसी से साझा न करें।",
-    hinglish: "{{code}} aapka ClinicQ login code hai. 5 minute mein expire hoga. Kisi ke saath share na karein.",
+    en: "{{code}} is your Q-Incolo login code. It expires in 5 minutes. Don't share it with anyone.",
+    hi: "{{code}} आपका Q-Incolo लॉगिन कोड है। यह 5 मिनट में समाप्त हो जाएगा। इसे किसी से साझा न करें।",
+    hinglish: "{{code}} aapka Q-Incolo login code hai. 5 minute mein expire hoga. Kisi ke saath share na karein.",
   },
   WALKIN_BAD_CODE: {
     en: "Please scan the QR code at the reception desk to join today's queue 😊 If you'd like to book for another day, just tell me when.",
@@ -529,9 +529,9 @@ export const COPY = {
     hinglish: ["Sorry{{nameJi}}, isme main yahan madad nahi kar sakti 🙏 Main appointment book, reschedule ya cancel kar sakti hoon, queue mein aapki baari bata sakti hoon, ya clinic ka time aur address bata sakti hoon. Kya karna hai?", "Sorry{{nameJi}}, yeh mere kaam se bahar hai 🙏 Main appointments, queue mein aapki baari, aur clinic ke time aur address mein madad kar sakti hoon. Kya karna hai?"],
   },
   GRIEVANCE_INFO: {
-    en: "For privacy questions or complaints 🙏\n• Grievance Officer: {{grievanceOfficer}}, Incolo Systems (ClinicQ), {{grievanceEmail}}\n• {{clinicName}}: {{clinicPhone}}\nPrivacy policy: {{noticeUrl}}\n\nYou can also type \"my data\" to see what we keep, or \"delete my data\" to erase it. If you're not satisfied with our reply, you can complain to the Data Protection Board of India.",
-    hi: "निजता से जुड़े सवाल या शिकायत के लिए 🙏\n• शिकायत अधिकारी: {{grievanceOfficer}}, Incolo Systems (ClinicQ), {{grievanceEmail}}\n• {{clinicName}}: {{clinicPhone}}\nप्राइवेसी पॉलिसी: {{noticeUrl}}\n\nआप \"my data\" लिखकर देख सकते हैं कि हम क्या रखते हैं, या \"delete my data\" लिखकर उसे हटा सकते हैं। जवाब से संतुष्ट न हों तो आप भारत के डेटा प्रोटेक्शन बोर्ड में शिकायत कर सकते हैं।",
-    hinglish: "Privacy se jude sawaal ya shikayat ke liye 🙏\n• Grievance Officer: {{grievanceOfficer}}, Incolo Systems (ClinicQ), {{grievanceEmail}}\n• {{clinicName}}: {{clinicPhone}}\nPrivacy policy: {{noticeUrl}}\n\nAap \"my data\" likhkar dekh sakte hain ki hum kya rakhte hain, ya \"delete my data\" likhkar use hata sakte hain. Jawab se santusht na hon to aap Data Protection Board of India mein shikayat kar sakte hain.",
+    en: "For privacy questions or complaints 🙏\n• Grievance Officer: {{grievanceOfficer}}, Incolo Systems (Q-Incolo), {{grievanceEmail}}\n• {{clinicName}}: {{clinicPhone}}\nPrivacy policy: {{noticeUrl}}\n\nYou can also type \"my data\" to see what we keep, or \"delete my data\" to erase it. If you're not satisfied with our reply, you can complain to the Data Protection Board of India.",
+    hi: "निजता से जुड़े सवाल या शिकायत के लिए 🙏\n• शिकायत अधिकारी: {{grievanceOfficer}}, Incolo Systems (Q-Incolo), {{grievanceEmail}}\n• {{clinicName}}: {{clinicPhone}}\nप्राइवेसी पॉलिसी: {{noticeUrl}}\n\nआप \"my data\" लिखकर देख सकते हैं कि हम क्या रखते हैं, या \"delete my data\" लिखकर उसे हटा सकते हैं। जवाब से संतुष्ट न हों तो आप भारत के डेटा प्रोटेक्शन बोर्ड में शिकायत कर सकते हैं।",
+    hinglish: "Privacy se jude sawaal ya shikayat ke liye 🙏\n• Grievance Officer: {{grievanceOfficer}}, Incolo Systems (Q-Incolo), {{grievanceEmail}}\n• {{clinicName}}: {{clinicPhone}}\nPrivacy policy: {{noticeUrl}}\n\nAap \"my data\" likhkar dekh sakte hain ki hum kya rakhte hain, ya \"delete my data\" likhkar use hata sakte hain. Jawab se santusht na hon to aap Data Protection Board of India mein shikayat kar sakte hain.",
   },
   ERASE_KEPT: {
     en: "Okay, I haven't deleted anything. Your details stay as they are 😊",

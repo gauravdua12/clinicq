@@ -108,5 +108,5 @@ export async function buildApp(opts: BuildOpts): Promise<{ app: FastifyInstance;
 function policyHtml(file: "privacy.html" | "data-deletion.html" | "terms.html", env: { GRIEVANCE_EMAIL: string; GRIEVANCE_OFFICER: string }): string {
   const here = dirname(fileURLToPath(import.meta.url));
   const p = join(here, file);
-  return (existsSync(p) ? readFileSync(p, "utf8") : "<h1>ClinicQ Privacy Policy</h1>").replaceAll("{{grievanceEmail}}", env.GRIEVANCE_EMAIL).replaceAll("{{grievanceOfficer}}", env.GRIEVANCE_OFFICER);
+  return (existsSync(p) ? readFileSync(p, "utf8") : "<h1>Q-Incolo Privacy Policy</h1>").replaceAll("{{grievanceEmail}}", env.GRIEVANCE_EMAIL).replaceAll("{{grievanceOfficer}}", env.GRIEVANCE_OFFICER);
 }

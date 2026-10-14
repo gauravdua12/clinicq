@@ -236,7 +236,7 @@ describe("privacy questions and complaints", () => {
     const P = nextPhone();
     await h.say(P, "privacy");
     const m = body(h.wa.last(P));
-    expect(m).toMatch(/Grievance Officer: Gaurav Dua, Incolo Systems \(ClinicQ\), customercare@incolosystems\.com/);
+    expect(m).toMatch(/Grievance Officer: Gaurav Dua, Incolo Systems \(Q-Incolo\), customercare@incolosystems\.com/);
     expect(m).toMatch(/Dr\. Sharma's Clinic: \+91/);
     expect(m).toMatch(/Privacy policy: http/);
     expect(m).toMatch(/Data Protection Board of India/);

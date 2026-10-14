@@ -48,7 +48,7 @@ export async function fetchPublicText(raw: string, maxChars = 12000): Promise<st
     const host = url.hostname;
     const addrs = isIP(host) ? [{ address: host }] : await lookup(host, { all: true });
     if (!addrs.length || addrs.some((a) => privateIp(a.address))) throw new Error("private_address");
-    const res = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(8000), headers: { "user-agent": "ClinicQ-DemoStudio/1.0", accept: "text/html,text/plain" } });
+    const res = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(8000), headers: { "user-agent": "Q-Incolo-DemoStudio/1.0", accept: "text/html,text/plain" } });
     if (res.status >= 300 && res.status < 400 && res.headers.get("location")) { url = new URL(res.headers.get("location")!, url); continue; }
     if (!res.ok) throw new Error(`http_${res.status}`);
     const reader = res.body?.getReader();

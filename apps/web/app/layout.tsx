@@ -7,7 +7,7 @@ const sora = localFont({ src: "../../../node_modules/@fontsource-variable/sora/f
 const hanken = localFont({ src: "../../../node_modules/@fontsource-variable/hanken-grotesk/files/hanken-grotesk-latin-wght-normal.woff2", weight: "100 900", variable: "--font-hanken", display: "swap" });
 const deva = localFont({ src: "../../../node_modules/@fontsource-variable/noto-sans-devanagari/files/noto-sans-devanagari-devanagari-wght-normal.woff2", weight: "100 900", variable: "--font-deva", display: "swap" });
 
-export const metadata: Metadata = { title: "ClinicQ", description: "Appointments, walk-ins and the token queue — on WhatsApp." };
+export const metadata: Metadata = { title: "Q-Incolo", description: "Appointments, walk-ins and the token queue — on WhatsApp." };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#1d4ed8" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

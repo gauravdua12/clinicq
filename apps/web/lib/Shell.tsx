@@ -37,7 +37,7 @@ export function Shell({ active, children, title, actions }: { active: string; ch
   return (
     <div className="app">
       <aside className="rail" aria-label="Main">
-        <div className="brand"><span className="brand-mark">Q</span>ClinicQ</div>
+        <div className="brand"><span className="brand-mark">Q</span>Q-Incolo</div>
         {links.map((l) => <Link key={l.href} href={l.href} className={`nav ${active === l.href ? "active" : ""}`}>{l.icon}{l.label}</Link>)}
         <div className="foot">
           {me && <div><b style={{ color: "var(--ink)" }}>{me.name}</b><div>{me.role === "DOCTOR" ? "Doctor · admin" : "Staff"}</div></div>}
@@ -47,7 +47,7 @@ export function Shell({ active, children, title, actions }: { active: string; ch
       <div className="main">
         <header className="mainbar">
           <div style={{ minWidth: 0 }}>
-            <div className="clinic">{clinic?.name ?? "ClinicQ"}</div>
+            <div className="clinic">{clinic?.name ?? "Q-Incolo"}</div>
             {title && <div className="small muted">{title}</div>}
           </div>
           {clinic?.isDemo && <span className="demopill">Demo</span>}

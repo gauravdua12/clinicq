@@ -1,5 +1,7 @@
 # CLAUDE.md: ClinicQ (WhatsApp clinic assistant)
 
+**Product name shown to people: Q-Incolo** (by Incolo Systems), in the dashboard, WhatsApp messages, policy pages and Meta app. "ClinicQ" / `clinicq` remains the internal codename (packages, services, database, folders).
+
 ClinicQ is a WhatsApp assistant for one doctor's clinic (solo, or with a small staff). It handles appointment booking, walk-ins, a single daily token queue and live tracking.
 It stores **logistics only, never medical data.** The approved spec lives in `docs/`. Read the relevant doc before you change a module.
 
