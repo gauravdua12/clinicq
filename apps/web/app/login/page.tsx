@@ -47,6 +47,7 @@ export default function Login() {
           ) : (
             <form onSubmit={async (e) => { e.preventDefault(); setBusy(true); try { await api("/api/auth/verify", { body: { phone, code } }); go(); } catch { setErr("That code didn't match. Check the latest WhatsApp message and try again."); } finally { setBusy(false); } }}>
               <p className="small" style={{ margin: 0 }}>We sent a 6-digit code to <b>{phone}</b> on WhatsApp.</p>
+              <p className="small muted" style={{ margin: "6px 0 0" }}>Not received in a minute? From this phone, send "hi" to the clinic's ClinicQ WhatsApp number, then tap <b>Use a different number</b> and send the code again.</p>
               <label htmlFor="cd">Code</label>
               <input id="cd" value={code} onChange={(e) => { setCode(e.target.value.replace(/\D/g, "")); setErr(null); }} inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus style={{ letterSpacing: "0.3em", fontSize: 20, fontFamily: "var(--font-display)" }} />
               {err && <div className="err">{err}</div>}
