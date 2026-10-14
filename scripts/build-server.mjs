@@ -14,4 +14,4 @@ await build({
   banner: { js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);" },
   sourcemap: true, logLevel: "info",
 });
-if (existsSync("apps/server/src/privacy.html")) { mkdirSync("apps/server/dist", { recursive: true }); cpSync("apps/server/src/privacy.html", "apps/server/dist/privacy.html"); }
+for (const f of ["privacy.html", "data-deletion.html", "terms.html"]) if (existsSync(`apps/server/src/${f}`)) { mkdirSync("apps/server/dist", { recursive: true }); cpSync(`apps/server/src/${f}`, `apps/server/dist/${f}`); }

@@ -326,3 +326,9 @@ sent twice, plus live-AI personas u32–u36.
 - After a cancellation, if other bookings remain: `CX_DONE_MORE` lists them with [Cancel another] [No, that's all]. With one
   booking, cancelling works exactly as before.
 - Typed numbers are matched in memory only; the state keeps the listed appointment IDs (`cxList`) and the chosen ones (`cxIds`).
+
+## Privacy questions and complaints (14 Oct 2026)
+"privacy", "privacy policy", "grievance", "complaint", "shikayat", "शिकायत" (from any state, even before consent) → `GRIEVANCE_INFO`:
+the Grievance Officer's email (Incolo Systems, `GRIEVANCE_EMAIL`), the clinic's phone, the privacy policy link, "my data" /
+"delete my data", and the Data Protection Board of India. Mid-booking, the pending question follows. "delete my data for privacy"
+still goes to deletion.

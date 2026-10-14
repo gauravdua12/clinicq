@@ -230,3 +230,51 @@ describe("queue messages agree with each other", () => {
     } finally { await q.close(); }
   });
 });
+
+describe("privacy questions and complaints", () => {
+  it("'privacy' and 'complaint' give the grievance officer, clinic contact and policy link, even before consent", async () => {
+    const P = nextPhone();
+    await h.say(P, "privacy");
+    const m = body(h.wa.last(P));
+    expect(m).toMatch(/Grievance Officer, Incolo Systems \(ClinicQ\): customercare@incolosystems\.com/);
+    expect(m).toMatch(/Dr\. Sharma's Clinic: \+91/);
+    expect(m).toMatch(/Privacy policy: http/);
+    expect(m).toMatch(/Data Protection Board of India/);
+    await h.say(P, "Hi");
+    expect((await h.kinds(P)).at(-1)).toBe("WELCOME_CONSENT"); // the welcome still follows normally
+    const Q = nextPhone();
+    await onboard(h, Q);
+    await h.say(Q, "I want to make a complaint");
+    expect((await h.kinds(Q)).at(-1)).toBe("GRIEVANCE_INFO");
+    await h.say(Q, "mujhe shikayat karni hai");
+    expect(body(h.wa.last(Q))).toMatch(/^Privacy se jude sawaal ya shikayat ke liye/);
+  });
+
+  it("mid-booking: the contact details, then the pending question again", async () => {
+    const P = nextPhone();
+    await bookTomorrowEvening(P);
+    await h.say(P, "what is your privacy policy?");
+    const k = await h.kinds(P);
+    expect(k.slice(-2)).toEqual(["GRIEVANCE_INFO", "ASK_VISIT_TYPE"]);
+  });
+
+  it("'delete my data for privacy' still deletes (asks to confirm)", async () => {
+    const P = nextPhone();
+    await onboard(h, P);
+    await h.say(P, "delete my data for privacy");
+    expect((await h.kinds(P)).at(-1)).toBe("ERASE_CONFIRM");
+  });
+
+  it("the policy and data deletion pages are public, name Incolo and the grievance email, and carry no draft note", async () => {
+    for (const path of ["/privacy", "/data-deletion", "/terms"]) {
+      const r = await h.app.inject({ url: path });
+      expect(r.statusCode, path).toBe(200);
+      expect(r.headers["content-type"]).toMatch(/text\/html/);
+      expect(r.body, path).toMatch(/Incolo Systems/);
+      expect(r.body, path).toMatch(/customercare@incolosystems\.com/);
+      expect(r.body, path).not.toMatch(/\{\{|lawyer|draft|DATA_POLICY/i);
+    }
+    const p = (await h.app.inject({ url: "/privacy" })).body;
+    for (const must of ["Data Fiduciary", "WhatsApp Business Account ID", "access token", "do <strong>not</strong> sell", "Grievance Officer", "delete my data", "How long we keep", "Amazon Web Services", "Children"]) expect(p, must).toContain(must);
+  });
+});

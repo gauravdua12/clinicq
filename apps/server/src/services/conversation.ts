@@ -62,6 +62,9 @@ interface Conv {
 }
 
 /** Phrases are matched in memory only (like emergency keywords) and never stored. */
+/** "privacy", "complaint", "grievance", "shikayat": who to contact (the privacy policy points patients here). */
+const GRIEVANCE_RE = /\b(privacy|privacy policy|grievance|grievance officer|data protection)\b|गोपनीयता|प्राइवेसी|शिकायत अधिकारी/i;
+const COMPLAINT_RE = /\b(complaint|complain|complaints|shikayat|shikaayat|shikayat)\b|शिकायत/i;
 const ABANDON_RE = /\b(don'?t|do not|dont)\s+(want|need)\b|\bno need\b|\bnot now\b|\bleave it\b|\bforget it\b|\bnahi?n?\s+(chahiye|karna|karni)\b|\brehne\s+do\b|\bchh?o+d\s*do\b|\bmat\s+karo\b|नहीं\s+चाहिए|रहने\s+दो|छोड़\s+दो|मत\s+करो/i;
 const RESTART_RE = /^\s*(start\s+(over|again|fresh)|restart|reset|new\s+chat|shuru\s+se|phir\s+se\s+shuru|फिर\s+से\s+शुरू|शुरू\s+से)\b/i;
 /** Buttons from a conversation that has since been reset; they no longer carry enough context to continue. */
@@ -77,7 +80,7 @@ function languageTarget(text: string): Lang | null {
 }
 
 /** After these the conversation is complete; a bare "ok / sure / thanks" deserves a polite close, not a menu. */
-const CLOSING = new Set(["BOOKING_CONFIRMED", "CX_DONE", "CX_KEPT", "ERASE_KEPT", "CX_DONE_MANY", "CX_KEPT_MANY", "CX_REST_KEPT", "RS_DONE", "REMINDER_CONFIRMED", "STATUS", "STATUS_BOOKED", "STATUS_NEXT", "STATUS_FUTURE",
+const CLOSING = new Set(["GRIEVANCE_INFO", "BOOKING_CONFIRMED", "CX_DONE", "CX_KEPT", "ERASE_KEPT", "CX_DONE_MANY", "CX_KEPT_MANY", "CX_REST_KEPT", "RS_DONE", "REMINDER_CONFIRMED", "STATUS", "STATUS_BOOKED", "STATUS_NEXT", "STATUS_FUTURE",
   "THANKS_REPLY", "ACK_CLOSING", "MY_DATA", "MY_APPOINTMENTS", "CLINIC_ADDRESS", "CLINIC_FEES", "CLINIC_TIMINGS", "ALT_NUMBER_SAVED", "ARRIVED_OK", "ALREADY_IN_QUEUE",
   "LANGUAGE_SET", "OPTED_IN", "OPTED_OUT", "CALL_CLINIC", "YOUR_TURN"]);
 
@@ -125,7 +128,7 @@ class Turn {
   b(id: C.BtnId, vars: C.Vars = {}): string { return C.btn(id, this.lang, vars); }
   baseVars(): C.Vars {
     const c = this.info.clinic;
-    return { clinicName: c.name, clinicPhone: c.phone, noticeUrl: c.noticeUrl, addressShort: c.addressShort, address: c.addressFull, mapsLine: mapsLine(this.info), sessionHours: sessionHours(this.info), sessionsText: sessionsText(this.info), doctor: this.info.doctor.displayName };
+    return { clinicName: c.name, clinicPhone: c.phone, noticeUrl: c.noticeUrl, grievanceEmail: this.ctx.env.GRIEVANCE_EMAIL, addressShort: c.addressShort, address: c.addressFull, mapsLine: mapsLine(this.info), sessionHours: sessionHours(this.info), sessionsText: sessionsText(this.info), doctor: this.info.doctor.displayName };
   }
   nameJi(name?: string | null): string {
     if (!name) return "";
@@ -268,6 +271,12 @@ async function onText(t: Turn, text: string, isVoice: boolean): Promise<void> {
   const emergencyKw = safety.matchesEmergency(text, t.info.settings.emergencyKeywordsExtra);
   if (emergencyKw) return emergency(t);
   if (RESTART_RE.test(text) && t.conv.state !== "AWAIT_CONSENT") return stopFlow(t, "STARTED_OVER");
+  // Privacy questions and complaints get the grievance contact, before anything else (no consent needed to ask).
+  if ((GRIEVANCE_RE.test(text) || (COMPLAINT_RE.test(text) && text.trim().split(/\s+/).length <= 8)) && !/\b(delete|erase|remove|hatao|mita)\b/i.test(text)) {
+    if (!t.conv.langLock) t.conv.lang = /[ऀ-ॿ]/.test(text) ? "hi" : /\b(shikayat|shikaayat|karni|hai|kaise|kahan|kisse)\b/i.test(text) ? "hinglish" : t.conv.lang;
+    await t.text("GRIEVANCE_INFO");
+    return t.conv.state.startsWith("BK_") || t.conv.state.startsWith("CX_") || t.conv.state.startsWith("RS_") ? reprompt(t) : undefined;
+  }
   // "all / both / saare / dono": every upcoming appointment (for cancelling), whatever else the message says.
   t.negated = /\b(no|nahi|nahin|na|mat|don'?t|not|keep)\b|नहीं|मत/i.test(text);
   t.allWord = /\b(all|both|saare|sare|saari|sab|sabhi|dono|donon)\b|सब|सभी|सारे|दोनों/i.test(text);

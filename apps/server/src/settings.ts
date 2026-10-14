@@ -34,7 +34,7 @@ export const ClinicSettings = z.object({
     auditDays: z.number().default(365),
   }).default({ messageLogDays: 90, visitAnonymiseDays: 180, inactiveProfileMonths: 12, auditDays: 365 }),
   emergencyKeywordsExtra: z.array(z.string()).default([]),
-  noticeVersion: z.string().default("2026-10-v1"),
+  noticeVersion: z.string().default("2026-10-v2"),
 });
 export type ClinicSettings = z.infer<typeof ClinicSettings>;
 

@@ -70,7 +70,7 @@ Response time for each: immediate (automated). Complex cases are flagged to the 
 HI:
 > शुरू करने से पहले: आपकी विज़िट मैनेज करने के लिए डॉ. शर्मा क्लिनिक केवल आपका नाम, फ़ोन नंबर और अपॉइंटमेंट की जानकारी सेव करता है। यहाँ शेयर की गई कोई भी स्वास्थ्य जानकारी हम नहीं रखते। अपना डेटा देखने या हटाने के लिए कभी भी "my data" लिखें। पूरी जानकारी: {{noticeUrl}}
 
-**Full notice** (`/privacy` page, versioned as `noticeVersion`). Sections to include:
+**Full notice**: published as the ClinicQ Privacy Policy at `/privacy` (operator: Incolo Systems; also `/data-deletion` and `/terms`; grievance email from `GRIEVANCE_EMAIL`, default customercare@incolosystems.com). It covers:
 1. Who we are (the clinic as Data Fiduciary, with contact details).
 2. What we collect (§2 table in plain words) and what we don't (§3).
 3. Why (booking, reminders, queue updates, follow-up reminders) and the legal basis (consent).

@@ -68,7 +68,10 @@ export async function buildApp(opts: BuildOpts): Promise<{ app: FastifyInstance;
       try { await db.$queryRaw`SELECT 1`; } catch { dbOk = false; }
       return { ok: dbOk, db: dbOk };
     });
-    scope.get("/privacy", async (_req, reply) => reply.type("text/html").send(privacyHtml()));
+    // Public policy pages (linked from WhatsApp and from the Meta app settings): no login, cacheable.
+    scope.get("/privacy", async (_req, reply) => reply.type("text/html").header("cache-control", "public, max-age=300").send(policyHtml("privacy.html", env.GRIEVANCE_EMAIL)));
+    scope.get("/data-deletion", async (_req, reply) => reply.type("text/html").header("cache-control", "public, max-age=300").send(policyHtml("data-deletion.html", env.GRIEVANCE_EMAIL)));
+    scope.get("/terms", async (_req, reply) => reply.type("text/html").header("cache-control", "public, max-age=300").send(policyHtml("terms.html", env.GRIEVANCE_EMAIL)));
 
     await webhookRoutes(scope, ctx);
     await flowRoutes(scope, ctx);
@@ -102,8 +105,8 @@ export async function buildApp(opts: BuildOpts): Promise<{ app: FastifyInstance;
   return { app, ctx, ai };
 }
 
-function privacyHtml(): string {
+function policyHtml(file: "privacy.html" | "data-deletion.html" | "terms.html", grievanceEmail: string): string {
   const here = dirname(fileURLToPath(import.meta.url));
-  const p = join(here, "privacy.html");
-  return existsSync(p) ? readFileSync(p, "utf8") : "<h1>Privacy notice</h1>";
+  const p = join(here, file);
+  return (existsSync(p) ? readFileSync(p, "utf8") : "<h1>ClinicQ Privacy Policy</h1>").replaceAll("{{grievanceEmail}}", grievanceEmail);
 }

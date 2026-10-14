@@ -528,6 +528,11 @@ export const COPY = {
     hi: ["माफ़ कीजिए{{nameJi}}, इसमें मैं यहाँ मदद नहीं कर सकती 🙏 मैं अपॉइंटमेंट बुक, री-शेड्यूल या कैंसल कर सकती हूँ, कतार में आपकी बारी बता सकती हूँ, या क्लिनिक का समय और पता बता सकती हूँ। आप क्या करना चाहेंगे?", "माफ़ कीजिए{{nameJi}}, यह मेरे काम से बाहर है 🙏 मैं अपॉइंटमेंट, कतार में आपकी बारी, और क्लिनिक के समय व पते में मदद कर सकती हूँ। आप क्या करना चाहेंगे?"],
     hinglish: ["Sorry{{nameJi}}, isme main yahan madad nahi kar sakti 🙏 Main appointment book, reschedule ya cancel kar sakti hoon, queue mein aapki baari bata sakti hoon, ya clinic ka time aur address bata sakti hoon. Kya karna hai?", "Sorry{{nameJi}}, yeh mere kaam se bahar hai 🙏 Main appointments, queue mein aapki baari, aur clinic ke time aur address mein madad kar sakti hoon. Kya karna hai?"],
   },
+  GRIEVANCE_INFO: {
+    en: "For privacy questions or complaints 🙏\n• Grievance Officer, Incolo Systems (ClinicQ): {{grievanceEmail}}\n• {{clinicName}}: {{clinicPhone}}\nPrivacy policy: {{noticeUrl}}\n\nYou can also type \"my data\" to see what we keep, or \"delete my data\" to erase it. If you're not satisfied with our reply, you can complain to the Data Protection Board of India.",
+    hi: "निजता से जुड़े सवाल या शिकायत के लिए 🙏\n• शिकायत अधिकारी, Incolo Systems (ClinicQ): {{grievanceEmail}}\n• {{clinicName}}: {{clinicPhone}}\nप्राइवेसी पॉलिसी: {{noticeUrl}}\n\nआप \"my data\" लिखकर देख सकते हैं कि हम क्या रखते हैं, या \"delete my data\" लिखकर उसे हटा सकते हैं। जवाब से संतुष्ट न हों तो आप भारत के डेटा प्रोटेक्शन बोर्ड में शिकायत कर सकते हैं।",
+    hinglish: "Privacy se jude sawaal ya shikayat ke liye 🙏\n• Grievance Officer, Incolo Systems (ClinicQ): {{grievanceEmail}}\n• {{clinicName}}: {{clinicPhone}}\nPrivacy policy: {{noticeUrl}}\n\nAap \"my data\" likhkar dekh sakte hain ki hum kya rakhte hain, ya \"delete my data\" likhkar use hata sakte hain. Jawab se santusht na hon to aap Data Protection Board of India mein shikayat kar sakte hain.",
+  },
   ERASE_KEPT: {
     en: "Okay, I haven't deleted anything. Your details stay as they are 😊",
     hi: "ठीक है, मैंने कुछ भी डिलीट नहीं किया। आपकी जानकारी जैसी थी वैसी ही है 😊",
