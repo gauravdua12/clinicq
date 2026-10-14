@@ -139,8 +139,9 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
       const appt = await confirmHold(ctx, held.id, b.data.visitType, "STAFF");
       const lang = acc.language;
       const vars = { name: firstName(b.data.name), dayShort: T.fmtDayShort(b.data.date, lang), time: T.fmtTime(b.data.startMin), token: appt.token ?? "", addressShort: info.clinic.addressShort, clinicName: info.clinic.name, mapsLine: "", apptId: appt.id };
-      await sendToAccount(ctx, acc.id, { kind: "text", body: C.render("BOOKING_CONFIRMED", lang, vars) }, { kind: "BOOKING_CONFIRMED", template: { name: "appointment_confirmed", lang, vars } });
-      return { id: appt.id, token: appt.token };
+      // Tell the desk whether WhatsApp took the confirmation (e.g. not on WhatsApp, or not a test-number recipient).
+      const whatsappSent = await sendToAccount(ctx, acc.id, { kind: "text", body: C.render("BOOKING_CONFIRMED", lang, vars) }, { kind: "BOOKING_CONFIRMED", template: { name: "appointment_confirmed", lang, vars } });
+      return { id: appt.id, token: appt.token, whatsappSent };
     } catch (e) {
       if (e instanceof SlotTakenError || e instanceof FamilySlotError) return sendErr(reply, 409, "slot_taken");
       throw e;

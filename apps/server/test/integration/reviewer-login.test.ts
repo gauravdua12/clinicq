@@ -58,3 +58,21 @@ describe("App Review login", () => {
     expect((await post("/api/auth/verify", { phone: PHONE, code: "482913" })).statusCode).toBe(401);
   });
 });
+
+describe("booking from the dashboard reports whether WhatsApp took the confirmation", () => {
+  it("whatsappSent is true when sent, false when WhatsApp refuses (the booking is made either way)", async () => {
+    h = await harness({ start: "2026-10-09T12:00:00+05:30" });
+    const login = await h.app.inject({ method: "POST", url: "/api/auth/dev-login", payload: { role: "STAFF" } });
+    const sid = login.cookies.find((c) => c.name === "sid")!.value;
+    const book = (phone: string, startMin: number) => h.app.inject({ method: "POST", url: "/api/appointments", cookies: { sid }, payload: { name: "Kiran Rao", phone, date: "2026-10-10", startMin, visitType: "NEW" } });
+    const ok = await book("9811122334", 600);
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toMatchObject({ token: "A-1", whatsappSent: true });
+    h.wa.failNext = 10; // e.g. not a WhatsApp number, or not a test-number recipient
+    const no = await book("9811122335", 620);
+    expect(no.statusCode).toBe(200);
+    expect(no.json()).toMatchObject({ whatsappSent: false });
+    h.wa.failNext = 0;
+    expect(await h.db.appointment.count({ where: { status: "BOOKED" } })).toBe(2);
+  });
+});

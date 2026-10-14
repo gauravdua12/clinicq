@@ -89,6 +89,7 @@ test("appointments: book on behalf, validation, cancel", async ({ page }) => {
   await page.getByRole("button", { name: "Book", exact: true }).last().click();
   const row = page.getByRole("row").filter({ hasText: "Kiran Rao" });
   await expect(row).toContainText("A-2");
+  await expect(page.getByRole("status")).toContainText("Booked Kiran Rao at 10:15 AM. Confirmation sent on WhatsApp.");
   page.once("dialog", (d) => d.accept());
   await row.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("row").filter({ hasText: "Kiran Rao" })).toHaveCount(0);

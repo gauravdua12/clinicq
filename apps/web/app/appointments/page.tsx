@@ -18,6 +18,7 @@ export default function Appointments() {
   const [rows, setRows] = useState<Appt[]>([]);
   const [slots, setSlots] = useState<SlotRow[]>([]);
   const [book, setBook] = useState<SlotRow | null>(null);
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const days = useMemo(() => Array.from({ length: 8 }, (_, i) => addDays(today, i)), [today]);
 
   const load = useCallback(async () => {
@@ -31,7 +32,8 @@ export default function Appointments() {
   return (
     <Shell active="/appointments">
       <h1>Appointments</h1>
-      <div className="tabs">{days.map((d) => <button key={d} className={d === date ? "active" : ""} onClick={() => setDate(d)}>{label(d)}</button>)}</div>
+      <div className="tabs">{days.map((d) => <button key={d} className={d === date ? "active" : ""} onClick={() => { setDate(d); setNotice(null); }}>{label(d)}</button>)}</div>
+      {notice && <div className={notice.ok ? "ok" : "err"} role="status" style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", gap: 10 }}><span>{notice.text}</span><button className="ghost small" style={{ padding: 0 }} aria-label="Dismiss" onClick={() => setNotice(null)}>×</button></div>}
       <div className="card">
         {slots.length === 0 && <div className="empty">Clinic closed on this day</div>}
         <table>
@@ -57,12 +59,18 @@ export default function Appointments() {
           </tbody>
         </table>
       </div>
-      {book && <BookModal date={date} slot={book} onClose={() => setBook(null)} onDone={() => { setBook(null); void load(); }} />}
+      {book && <BookModal date={date} slot={book} onClose={() => setBook(null)} onDone={(name, sent) => {
+        setBook(null);
+        setNotice(sent
+          ? { ok: true, text: `Booked ${name} at ${book.time}. Confirmation sent on WhatsApp.` }
+          : { ok: false, text: `Booked ${name} at ${book.time}. The WhatsApp confirmation couldn't be delivered to this number, so please tell the patient directly.` });
+        void load();
+      }} />}
     </Shell>
   );
 }
 
-function BookModal({ date, slot, onClose, onDone }: { date: string; slot: SlotRow; onClose: () => void; onDone: () => void }) {
+function BookModal({ date, slot, onClose, onDone }: { date: string; slot: SlotRow; onClose: () => void; onDone: (name: string, whatsappSent: boolean) => void }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [visitType, setVisitType] = useState("NEW");
@@ -82,7 +90,7 @@ function BookModal({ date, slot, onClose, onDone }: { date: string; slot: SlotRo
           <button className="primary" onClick={async () => {
             if (!name.trim()) return setErr("Enter the patient's name.");
             if (!/\d{10}/.test(phone.replace(/\D/g, ""))) return setErr("Enter a 10-digit mobile number.");
-            try { await api("/api/appointments", { body: { name: name.trim(), phone, date, startMin: slot.startMin, visitType } }); onDone(); }
+            try { const r = await api<{ whatsappSent?: boolean }>("/api/appointments", { body: { name: name.trim(), phone, date, startMin: slot.startMin, visitType } }); onDone(name.trim(), r.whatsappSent !== false); }
             catch (e) { setErr(e instanceof ApiError && e.code.startsWith("slot") ? "That slot was just taken." : "Couldn't book. Try again."); }
           }}>Book</button>
         </div>
