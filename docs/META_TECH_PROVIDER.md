@@ -66,3 +66,13 @@ company website and use those URLs.
 ## What still needs a person
 - Business verification documents, domain verification, and recording the screencasts.
 - Grievance Officer: Gaurav Dua (named on the policy, data deletion page and the WhatsApp "privacy" reply). Registered address of Incolo Systems: optional, add it if you want it on the policy.
+
+## Platform → Website → testing instructions (answers)
+1. **Where can we find the app?** https://q.incolo.si (web dashboard for clinic staff; patients use it through the clinic's WhatsApp number).
+2. **Instructions for accessing the app:** open https://q.incolo.si/login → enter **9000000099** → "Send code on WhatsApp" → enter the reviewer code (no WhatsApp message is sent for this test login) → Sign in. Queue board and Appointments are in the left menu; to book, Appointments → pick a free slot → Book. The WhatsApp side is shown in the screencasts (our test number only delivers to registered recipients).
+3. **Is Facebook Login integrated?** Not yet. Facebook Login for Business will be used only for WhatsApp Embedded Signup, when a clinic connects its WhatsApp Business Account; staff log in with a WhatsApp one-time code.
+4. **Access codes / test credentials:** phone **9000000099**, code = the reviewer code (stored as the SSM secret `/clinicq/REVIEWER_CODE`; given to the reviewer only, never committed). Free during review; no payment or membership needed.
+5. **Gift codes:** not applicable: a free web app, nothing to download from an app store.
+6. **Geo restrictions:** none: the website is reachable worldwide, no geo-blocking.
+
+The reviewer login (`REVIEWER_PHONE` in the env base + `/clinicq/REVIEWER_CODE`) signs in as "App Reviewer", an ordinary staff member of the demo clinic (never on duty, never an Incolo admin). Switch it off after approval: delete the SSM parameter and run `install.sh update`.
