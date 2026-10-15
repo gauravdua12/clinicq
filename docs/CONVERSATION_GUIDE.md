@@ -38,6 +38,7 @@ Shown in the welcome message and in HELP:
 | `WAIT` | hold, wait, ek minute, ruko, baad mein batata hoon | "take your time"; the pending question is kept (not repeated) |
 | `RUDE` | stupid, useless, bakwas, pagal ho kya, "stop it now", "stop repeating" | apology + what I can do + clinic phone, then the pending question (never an unsubscribe) |
 | `HELP` | what can you do, who are you, are you a bot | what I can do, then the pending question or the menu |
+| `END` | don't want to book, no thanks, nothing, never mind, bye, that's all, close/end the chat, stop the booking, wrong number, nahi chahiye, kuch nahi, rehne do | a close that fits the moment (see "Declining and leaving"); never the menu, never an unsubscribe |
 | `OTHER` | anything else | mid-way: "Sorry, I didn't understand" + the question; idle: apology + what I can do + menu |
 Walk-in starts from the QR text pattern `WALKIN <CODE>-<DAILY>` (rule-based, not LLM).
 Flags: `hasNonBookingContent` (health details), `isEmergency` (from the keyword matcher, see §6.9).
@@ -332,3 +333,25 @@ sent twice, plus live-AI personas u32–u36.
 the Grievance Officer's email (Incolo Systems, `GRIEVANCE_EMAIL`), the clinic's phone, the privacy policy link, "my data" /
 "delete my data", and the Data Protection Board of India. Mid-booking, the pending question follows. "delete my data for privacy"
 still goes to deletion.
+
+## Declining and leaving (15 Oct 2026)
+Before this, "I don't want to book", "no thanks", "bye", "close this chat", "wrong number"… got the menu again, the next
+booking question, "Sorry, I can't help with that", or even an unsubscribe. Now, from any state (intent `END`, plus in-memory
+phrases in EN / Hinglish / Hindi):
+
+| Where | Reply (no buttons) |
+|---|---|
+| Before consent | `CLOSED_NO_CONSENT`: nothing has been saved |
+| Mid-booking (hold released) or rescheduling | `BOOKING_STOPPED`: stopped, nothing booked |
+| Menu / after a booking / number question | `CHAT_CLOSED` (two wordings) |
+| Confirming a cancellation | `CX_KEPT` / `CX_KEPT_MANY` (appointments kept) |
+| Confirming data deletion | `ERASE_KEPT` |
+| "wrong number", "by mistake" | `WRONG_NUMBER` (also as a first message: no consent request) |
+| "I'll call the clinic" | `CALL_CLINIC` + contact card (no call-back request raised) |
+
+- Not an end when the message also asks for something: "not Monday, book Tuesday evening", "not for me, for my mother".
+- "I don't want my appointment" is a cancellation (asks to confirm). A bare "stop" is still an unsubscribe.
+- Bare "no": after the menu → `CHAT_CLOSED`; to who / name / visit type / day → `BOOKING_STOPPED`; to offered times or the
+  final confirmation → `OTHER_TIMES_OR_STOP` [Show free times] [Stop booking]; to "use this number?" → asks for the number.
+- "ok" after the menu → `MENU_NUDGE` (no repeated menu). "ok"/"thanks" after any close → `ACK_CLOSING`.
+Tested by `declines.test.ts` (14 states × 26 messages, then "ok"), live-AI personas u39–u44, and the live check.

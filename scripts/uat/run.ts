@@ -1,5 +1,5 @@
 /**
- * User-acceptance run: 38 patient personas talk to the real conversation engine with the LIVE
+ * User-acceptance run: 44 patient personas talk to the real conversation engine with the LIVE
  * language models (Qwen3 32B → Mistral Large 3 on Bedrock Mumbai) and Voxtral for voice.
  * A persona taps buttons like a person would (by label). Results → test-results/uat/.
  *
@@ -106,6 +106,18 @@ const P: Persona[] = [
     check: (r) => expectAll([has(r, "CX_CONFIRM_MANY"), "lists both bookings in one confirmation"], [has(r, "CX_DONE_MANY"), "cancels both together"], [r.booked.length === 0, "no booking left"]) },
   { id: "u38", title: "Two bookings, cancels one by number, keeps the other", setup: "self+mother", steps: [{ say: "book me tomorrow 11 am" }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म|Confirm karein/ }, { say: "book for my mother Monday 10:20 am" }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म|Confirm karein/ }, { say: "I want to cancel an appointment" }, { say: "2" }, { tap: /Yes, cancel|Haan, cancel|हाँ, कैंसल/ }, { tap: /that's all|itna hi|इतना ही/i }],
     check: (r) => expectAll([r.booked.length === 1, "one booking left"], [has(r, "CX_REST_KEPT"), "confirms the rest stay"]) },
+  { id: "u39", title: "Says 'I don't want to book' after the menu", setup: "self", steps: [{ say: "hi" }, { say: "I don't want to book" }, { say: "ok" }],
+    check: (r) => expectAll([has(r, "CHAT_CLOSED"), "polite close"], [r.kinds.at(-1) === "ACK_CLOSING", "'ok' afterwards closes too"], [r.kinds.slice(-2).join() === "CHAT_CLOSED,ACK_CLOSING", "no menu after declining"]) },
+  { id: "u40", title: "Hinglish: stops mid-booking ('nahi chahiye')", setup: "self", steps: [{ say: "kal shaam appointment chahiye" }, { say: "nahi chahiye, rehne do" }],
+    check: (r) => expectAll([has(r, "BOOKING_STOPPED"), "booking stopped"], [r.booked.length === 0, "nothing booked"], [!r.texts.at(-1)!.includes("[Appointment book"), "no menu"]) },
+  { id: "u41", title: "'close this chat' is not an unsubscribe", setup: "self", steps: [{ say: "book me monday morning" }, { say: "close this chat" }],
+    check: (r) => expectAll([has(r, "BOOKING_STOPPED") || has(r, "CHAT_CLOSED"), "closes"], [!has(r, "OPTED_OUT"), "not unsubscribed"]) },
+  { id: "u42", title: "Wrong number as the first message", steps: [{ say: "sorry, wrong number" }],
+    check: (r) => expectAll([r.kinds.join() === "WRONG_NUMBER", "only a short apology (no consent request)"]) },
+  { id: "u43", title: "'I'll call the clinic instead' mid-booking", setup: "self", steps: [{ say: "book me tomorrow evening" }, { say: "I'll just call the clinic instead" }],
+    check: (r) => expectAll([has(r, "CALL_CLINIC"), "clinic number given"], [r.booked.length === 0, "nothing booked"], [!has(r, "TALK_TO_STAFF"), "no call-back request raised"]) },
+  { id: "u44", title: "'I don't want my appointment' cancels with confirmation", setup: "self", steps: [{ say: "book me tomorrow 11 am" }, { tap: /New|Nayi|नई/i }, { tap: /^Confirm|कन्फ़र्म|Confirm karein/ }, { say: "I don't want my appointment anymore" }, { tap: /Yes, cancel|Haan, cancel/ }],
+    check: (r) => expectAll([has(r, "CX_CONFIRM"), "asks to confirm the cancellation"], [r.booked.length === 0, "cancelled"]) },
 ];
 
 const only = process.argv.includes("--only") ? process.argv[process.argv.indexOf("--only") + 1] : null;

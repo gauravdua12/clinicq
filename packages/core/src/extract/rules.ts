@@ -10,6 +10,13 @@ const HINGLISH_WORDS = /\b(hai|hain|kal|aaj|parso|mujhe|mera|meri|mere|karna|kar
 // Short words that are also English ("do", "so"…) only count when there are two of them ("kar do", "ke liye" is caught above).
 const HINGLISH_WEAK = /\b(ke|ki|ko|ho|kar|do|se)\b/gi;
 
+/** The person doesn't want to book or continue, or is leaving (shared with the conversation engine). */
+export const END_RE = /\b(don'?t|do not|dont)\s+(want|need|wanna)\b|\bno\s+(thanks|thank you|thx|need|booking|appointment)s?\b|\b(not|no longer)\s+(needed|required|interested)\b|^\s*(nothing|nothing else|nothing more)\b|\bnever\s?mind\b|\bchanged my mind\b|\b(bye|goodbye|good bye|bye bye|tata|see you)\b|\b(close|end|finish|stop|exit|quit)\s+(the\s+|this\s+|my\s+)?(chat|conversation|session|booking)\b|\bthat'?s\s+(all|it)\b|\bleave it\b|\bforget (it|about it)\b|\b(wrong number|wrong chat|by mistake|mistakenly|accidentally)\b|\bnahi?n?\s+(chahiye|karna|karni|karwana|karwani|lena|leni)\b|\bkuch\s+nahi?n?\b|\b(jarurat|zarurat|zaroorat)\s+nahi?n?\b|\brehne\s+do\b|\bchh?o+d\s*do\b|\bmat\s+karo\b|^\s*bas\s*(itna hi|itna|ho gaya)?\s*$|\bgalti se\b|\bgalat number\b|नहीं चाहिए|कुछ नहीं|रहने दो|छोड़ दो|मत करो|ज़रूरत नहीं|जरूरत नहीं|गलती से|गलत नंबर/i;
+/** Messaged by mistake: the reply says sorry and that nothing was booked. */
+export const WRONG_RE = /\b(wrong number|wrong chat|by mistake|mistakenly|accidentally|galti se|galat number)\b|गलती से|गलत नंबर/i;
+/** "I'll call the clinic (myself)": the clinic's number, not a call-back request. */
+export const CALL_SELF_RE = /\b(i'?ll|i will|will|let me)\s+(just\s+)?(call|phone|ring)\b|\bcall kar (lunga|lungi|loonga|loongi|lenge|leta|leti)\b|\bphone kar (lunga|lungi|loonga|loongi|lenge)\b|फ़ोन कर लूँगा|कॉल कर लूँगा/i;
+
 export function detectLanguage(text: string): Extraction["language"] {
   if (DEVANAGARI.test(text)) return "hi";
   return HINGLISH_WORDS.test(text) || (text.match(HINGLISH_WEAK)?.length ?? 0) >= 2 ? "hinglish" : "en";
@@ -172,6 +179,11 @@ function intentOf(t: string, ctx: ExtractContext, extracted: { time: string | nu
   const has = (re: RegExp) => re.test(s);
   if (has(/\b(delete|erase|remove|hatao|hata do|mita)\b.*\b(data|details|information|jankari)|\b(data|details|jankari)\b.*\b(delete|hatao|hata|remove|mita)/)) return "DELETE_DATA";
   if (has(/\b(my|mera|meri)\s+(data|details|information|jankari)\b/)) return "MY_DATA";
+  // Not wanting to go on ("don't want to book", "bye", "close the chat", "wrong number", "nahi chahiye") is END, checked
+  // before STOP (unsubscribe) and BOOK ("book" appears in "don't want to book"). Cancelling an appointment stays CANCEL.
+  // "I don't want my appointment" / "meri appointment nahi chahiye": cancelling the booking they have.
+  if (has(/\b(my|meri|mera|apni|apna)\s+(appointment|appointments|booking|visit)\b|मेरा अपॉइंटमेंट|मेरी अपॉइंटमेंट/) && has(END_RE)) return "CANCEL";
+  if (!has(/\b(cancel|radd)\b|कैंसल|रद्द/) && has(END_RE)) return "END";
   // "stop it now" / "stop repeating" out of frustration is a complaint about the replies, not a request to unsubscribe.
   if (has(/^stop (it|this|that|now|repeating)\b|\bstop repeating\b|\bsame (message|reply|thing) again\b/)) return "RUDE";
   const unsubscribe = has(/^(stop|unsubscribe)$|\bunsubscribe\b|\bstop (sending|messaging|the messages)\b|\b(mat bhejo|messages? band|message mat)\b/);
@@ -192,8 +204,8 @@ function intentOf(t: string, ctx: ExtractContext, extracted: { time: string | nu
     if (/BK_PICK_SLOT/.test(ctx.state) && extracted.time) return "PROVIDE";
     return /BK_|RS_|WALKIN/.test(ctx.state) && !has(/\b(book|booking|appointment)\b|\b(new|naya|nayi|another|dusra|doosra|ek aur)\b/) ? "PROVIDE" : "BOOK";
   }
-  if (s.split(/\s+/).length <= 6 && has(/^(hold( on)?|wait|one (min|minute|sec|second)|1 (min|minute)|give me a (min|minute|sec|second)|ek (min|minute|second)|ruko|rukiye|ruk jao|ruk|later|busy|baad mein|baad me|abhi busy)\b|\b(will (reply|tell|come back|get back) later|baad mein (batata|batati|bataunga|bataungi|karta|karti|baat))|रुको|रुकिए|बाद में/)) return "WAIT";
-  if (s.split(/\s+/).length <= 8 && has(/^(help|madad|menu|options?)\b|\b(what can you do|what do you do|who are you|are you (a )?(bot|robot|human|real)|how does (this|it) work|kya kar sakte|kaun ho|kya ho tum|how to use)\b|मदद/)) return "HELP";
+  if (s.split(/\s+/).length <= 6 && has(/^(hold( on)?|wait|one (min|minute|sec|second)|1 (min|minute)|give me a (min|minute|sec|second)|ek (min|minute|second)|ruko|rukiye|ruk jao|ruk|later|busy|baad mein|baad me|abhi busy|abhi nahi|not now|not right now)\b|\b(will (reply|tell|come back|get back) later|baad mein (batata|batati|bataunga|bataungi|karta|karti|baat))|रुको|रुकिए|बाद में/)) return "WAIT";
+  if (s.split(/\s+/).length <= 8 && has(/^(help|madad|menu|options?|test|testing|just checking|checking)\b|\b(what can you do|what do you do|who are you|are you (a )?(bot|robot|human|real)|how does (this|it) work|kya kar sakte|kaun ho|kya ho tum|how to use)\b|मदद/)) return "HELP";
   if (has(/^(hi+|hello|hey|hlo|namaste|namaskar|good (morning|afternoon|evening))\b/) && s.split(/\s+/).length <= 4) return "GREETING";
   if (has(/^(no|nahi|nahin|na|nope|nah|mat)\b/)) return extracted.time || extracted.date ? "DENY" : "DENY";
   if (has(/^(yes|haan|ha|han|haa|ok|okay|okk|theek|thik|sure|done|confirm|ji|ji haan|yep|yup|chalega|sahi)\b/)) return "AFFIRM";
@@ -266,6 +278,8 @@ export function rulesExtract(text: string, ctx: ExtractContext): Extraction {
     }
   }
   out.intent = intentOf(t, ctx, { time: out.time, date: out.date, name: out.newPersonName ?? out.selfName, phone: out.phone, relation, visit: out.visitType, pod: out.partOfDay, self: out.forWhom === "self" });
+  // "no booking needed" when a name was asked: no name, and nobody to book for.
+  if (out.intent === "END") { out.newPersonName = null; out.selfName = null; out.forWhom = "unknown"; out.relation = null; out.profileRef = null; }
   if (out.intent !== "CLINIC_INFO") out.clinicInfoTopic = null;
   if (out.intent === "CHANGE_LANGUAGE") out.language = /\bhindi\b|हिंदी/i.test(lower) ? "hi" : /\benglish\b/i.test(lower) ? "en" : out.language;
   out.possibleEmergency = matchesEmergency(t);

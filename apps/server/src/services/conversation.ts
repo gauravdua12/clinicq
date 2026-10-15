@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { decrypt, displayPhone, encrypt, normalizeIndianPhone, phoneHash, type PatientAccount, type VisitType, type Relation } from "@clinicq/db";
 import { copy as C, safety, slots as S, time as T } from "@clinicq/core";
-import { extract, type Extraction, type ExtractContext } from "@clinicq/core/extract/index";
+import { CALL_SELF_RE, END_RE, extract, WRONG_RE, type Extraction, type ExtractContext } from "@clinicq/core/extract/index";
 import type { Button, InboundMessage, ListSection, OutMsg } from "@clinicq/wa";
 import type { Ctx } from "../context";
 import { activeCountForProfile, cancelAppointment, confirmHold, FamilySlotError, holdSlot, releaseHold, reschedule, SlotTakenError, upcomingForAccount, type UpcomingView } from "./booking";
@@ -80,7 +80,7 @@ function languageTarget(text: string): Lang | null {
 }
 
 /** After these the conversation is complete; a bare "ok / sure / thanks" deserves a polite close, not a menu. */
-const CLOSING = new Set(["GRIEVANCE_INFO", "BOOKING_CONFIRMED", "CX_DONE", "CX_KEPT", "ERASE_KEPT", "CX_DONE_MANY", "CX_KEPT_MANY", "CX_REST_KEPT", "RS_DONE", "REMINDER_CONFIRMED", "STATUS", "STATUS_BOOKED", "STATUS_NEXT", "STATUS_FUTURE",
+const CLOSING = new Set(["CLINIC_CONTACT", "CHAT_CLOSED", "BOOKING_STOPPED", "CLOSED_NO_CONSENT", "WRONG_NUMBER", "GRIEVANCE_INFO", "BOOKING_CONFIRMED", "CX_DONE", "CX_KEPT", "ERASE_KEPT", "CX_DONE_MANY", "CX_KEPT_MANY", "CX_REST_KEPT", "RS_DONE", "REMINDER_CONFIRMED", "STATUS", "STATUS_BOOKED", "STATUS_NEXT", "STATUS_FUTURE",
   "THANKS_REPLY", "ACK_CLOSING", "MY_DATA", "MY_APPOINTMENTS", "CLINIC_ADDRESS", "CLINIC_FEES", "CLINIC_TIMINGS", "ALT_NUMBER_SAVED", "ARRIVED_OK", "ALREADY_IN_QUEUE",
   "LANGUAGE_SET", "OPTED_IN", "OPTED_OUT", "CALL_CLINIC", "YOUR_TURN"]);
 
@@ -88,7 +88,7 @@ const CLOSING = new Set(["GRIEVANCE_INFO", "BOOKING_CONFIRMED", "CX_DONE", "CX_K
 const PROMPTS = new Set(["WELCOME_CONSENT", "CONSENT_REMINDER", "CONFIRM_NUMBER", "ASK_ALT_NUMBER", "ALT_NUMBER_INVALID", "ASK_WHO", "ASK_NAME_SELF", "ASK_NAME_OTHER",
   "ASK_WHEN", "RS_ASK_WHEN", "ASK_WHEN_RETRY", "ASK_VISIT_TYPE", "CONFIRM_BOOKING_ASK", "RS_CONFIRM_ASK", "OFFER_NEAR_SLOTS", "SLOT_TAKEN_TYPED", "LIST_PICKER",
   "LIST_PICK_SESSION", "BOOK_LINK", "FLOW_BOOKING", "SAME_SLOT_FAMILY", "SLOT_RACE_DECLINED", "SLOT_RACE_LOST", "WALKIN_ASK_NAME", "WALKIN_CHECKING", "CX_CONFIRM",
-  "ERASE_CONFIRM", "RS_PICK_APPT", "CX_PICK_APPT", "CX_CONFIRM_MANY", "CX_DONE_MORE", "RESUME_PROMPT", "WELCOME_BACK_MIDFLOW", "STUCK_HELP", "LANGUAGE_PICK"]);
+  "ERASE_CONFIRM", "RS_PICK_APPT", "CX_PICK_APPT", "CX_CONFIRM_MANY", "CX_DONE_MORE", "OTHER_TIMES_OR_STOP", "RESUME_PROMPT", "WELCOME_BACK_MIDFLOW", "STUCK_HELP", "LANGUAGE_PICK"]);
 
 const QUESTION: Partial<Record<State, string>> = {
   AWAIT_CONSENT: "agree to the privacy notice?", AWAIT_NUMBER_CONFIRM: "use this number for booking?", AWAIT_ALT_NUMBER: "10-digit mobile number",
@@ -289,6 +289,7 @@ async function onText(t: Turn, text: string, isVoice: boolean): Promise<void> {
     if (picked) { text = ""; return picked.length === 1 ? askCancelConfirm(t, picked[0]!) : askCancelMany(t, picked); }
   }
   const abandon = ABANDON_RE.test(text);
+  const ending: Ending = { end: END_RE.test(text), wrong: WRONG_RE.test(text), callSelf: CALL_SELF_RE.test(text) };
   const langTarget = languageTarget(text);
   // "English please", "hindi mein baat karo", "Hinglish" on its own: a language request even if the model says otherwise.
   const langRequest = !!langTarget && (/\b(language|bhasha|baat|talk|speak|switch|reply|please|pls|mein|me)\b|भाषा|में/i.test(text) || text.trim().split(/\s+/).length <= 2);
@@ -302,6 +303,10 @@ async function onText(t: Turn, text: string, isVoice: boolean): Promise<void> {
   if (e.possibleEmergency) return emergency(t);
   if (!t.conv.langLock) t.conv.lang = e.language;
   text = ""; // raw text is not needed beyond this point
+
+  // Not wanting to go on ("don't want to book", "no thanks", "bye", "close the chat", "wrong number", "nahi chahiye",
+  // "I'll call the clinic"): answered for what it is, with no menu and no next question.
+  if (await wantsToEnd(t, e, ending)) return endChat(t, ending);
 
   // Courtesy and control messages ("hold on", "stupid", "what can you do?", "stop") get a proper answer first,
   // whatever question is pending, so the patient never just gets the same question again.
@@ -321,7 +326,7 @@ async function onText(t: Turn, text: string, isVoice: boolean): Promise<void> {
 
   // Mid-way through a booking, understand what the patient wants now instead of repeating the last question.
   const inBooking = t.conv.state.startsWith("BK_");
-  if (inBooking && (abandon || (e.intent === "CANCEL" && !e.date)) && !e.date && e.time == null && !e.partOfDay && !e.visitType) return stopFlow(t, "BOOKING_STOPPED");
+  if (inBooking && (abandon || (e.intent === "CANCEL" && !e.date)) && !e.date && e.time == null && !e.partOfDay && !e.visitType) return stopBooking(t);
   if (inBooking && e.intent === "GREETING") return welcomeBack(t);
   if (t.conv.state !== "IDLE" && e.intent === "GREETING") return stopFlow(t, "MAIN_MENU"); // e.g. "hi" instead of confirming a cancellation
   if (inBooking && e.intent === "BOOK" && !e.date && e.time == null && !e.partOfDay && !["BK_WHO", "BK_NAME"].includes(t.conv.state)) return newBooking(t, e);
@@ -426,22 +431,24 @@ async function onState(t: Turn, e: Extraction): Promise<void> {
   const s = t.conv.state;
   switch (s) {
     case "AWAIT_ALT_NUMBER": return altNumber(t, e);
-    case "BK_WHO": return answerWho(t, e);
-    case "BK_NAME": return answerName(t, e);
-    case "BK_WHEN": if (e.intent === "DENY" && !e.date && e.time == null) return stopFlow(t, "BOOKING_STOPPED"); return answerWhen(t, e);
+    // A bare "no" to who / name / visit type / when: the patient doesn't want to go on with the booking.
+    case "BK_WHO": if (e.intent === "DENY" && !answersSomething(e)) return stopBooking(t); return answerWho(t, e);
+    case "BK_NAME": if (e.intent === "DENY" && !answersSomething(e)) return stopBooking(t); return answerName(t, e);
+    case "BK_WHEN": if (e.intent === "DENY" && !e.date && e.time == null) return stopBooking(t); return answerWhen(t, e);
     case "BK_PICK_SLOT": return answerPick(t, e);
     case "BK_FLOW_OPEN": // typed a day/time instead of using the booking page
-      if (e.intent === "DENY" && !e.date && e.time == null) return stopFlow(t, "BOOKING_STOPPED");
+      if (e.intent === "DENY" && !e.date && e.time == null) return stopBooking(t);
       return answerWhen(t, e);
     case "BK_VISIT_TYPE":
       if (e.visitType) { t.conv.p.visitType = e.visitType; return askConfirm(t); }
+      if (e.intent === "DENY" && !answersSomething(e)) return stopBooking(t);
       if (e.date || e.time != null) return answerPick(t, e);
       return askVisitType(t);
     case "BK_CONFIRM":
       if (e.visitType) { t.conv.p.visitType = e.visitType; return askConfirm(t); }
       if (e.date || e.time != null) return answerPick(t, e);
       if (e.intent === "AFFIRM" || e.intent === "BOOK") return finalize(t);
-      if (e.intent === "DENY") return changeTime(t);
+      if (e.intent === "DENY") return otherTimesOrStop(t);
       return askConfirm(t);
     case "BK_RACE_DECLINED":
       if (e.date || e.time != null || e.partOfDay) { mergeWhen(t, e); return offer(t); }
@@ -470,7 +477,10 @@ async function onState(t: Turn, e: Extraction): Promise<void> {
   // IDLE
   if (e.intent === "BOOK" || (e.intent === "PROVIDE" && (e.date || e.time != null || e.partOfDay))) return startBooking(t, e);
   if (e.intent === "GREETING") return menu(t, "MAIN_MENU");
-  if (e.intent === "AFFIRM" || e.intent === "DENY") return t.conv.lastOut && CLOSING.has(t.conv.lastOut) ? t.text("ACK_CLOSING") : menu(t, "OTHER_HELP");
+  if (t.conv.lastOut && CLOSING.has(t.conv.lastOut) && (e.intent === "AFFIRM" || e.intent === "DENY")) return t.text("ACK_CLOSING");
+  // "no" to "How can I help?": nothing needed. "ok" to it: a nudge, not the same menu again.
+  if (e.intent === "DENY") return endChat(t, { end: true, wrong: false, callSelf: false });
+  if (e.intent === "AFFIRM") return t.conv.lastOut && MENUS.has(t.conv.lastOut) ? t.text("MENU_NUDGE") : menu(t, "OTHER_HELP");
   if (e.hasNonBookingContent) return;
   return menu(t, "OFF_TOPIC");
 }
@@ -590,7 +600,7 @@ async function onButton(t: Turn, id: string): Promise<void> {
     case "see_all": return slotPicker(t, t.conv.requested?.date ?? nowLocal(t.ctx).date);
     case "sess": { const [date, label] = (a ?? "").split("|"); return slotPicker(t, date ?? nowLocal(t.ctx).date, false, label); }
     case "vt": t.conv.p.visitType = a as VisitType; return askConfirm(t);
-    case "bk": return a === "yes" ? finalize(t) : a === "stop" ? stopFlow(t, "BOOKING_STOPPED") : changeTime(t);
+    case "bk": return a === "yes" ? finalize(t) : a === "stop" ? stopBooking(t) : changeTime(t);
     case "rsday": if (!a) return askWhen(t); t.conv.p.date = a; t.conv.p.time = null; t.conv.p.tq = null; t.conv.p.pod = undefined; return offer(t);
     case "lang": return a === "en" || a === "hi" || a === "hinglish" ? setLanguage(t, a) : askLanguage(t);
     case "resume":
@@ -973,7 +983,7 @@ async function answerPick(t: Turn, e: Extraction): Promise<void> {
     return offer(t);
   }
   if (e.intent === "AFFIRM" && offered.length === 1) return choose(t, offered[0]!);
-  if (e.intent === "DENY") return t.conv.raceLost ? raceDeclined(t, t.conv.requested?.time ?? null) : askWhen(t);
+  if (e.intent === "DENY") return t.conv.raceLost ? raceDeclined(t, t.conv.requested?.time ?? null) : otherTimesOrStop(t);
   if (e.date || e.partOfDay) { mergeWhen(t, e); return offer(t); }
   if (offered.length) return t.buttons(t.t("OFFER_NEXT_AVAILABLE"), "OFFER_NEAR_SLOTS", [...offered.slice(0, 2).map(slotBtn), { id: "see_all", title: t.b("SEE_ALL") }]);
   return askWhen(t);
@@ -1411,7 +1421,66 @@ async function setLanguage(t: Turn, lang: Lang): Promise<void> {
 }
 
 /** Drop whatever was in progress (releasing a held slot) and show the menu. */
-async function stopFlow(t: Turn, id: "BOOKING_STOPPED" | "STARTED_OVER" | "MAIN_MENU"): Promise<void> {
+interface Ending { end: boolean; wrong: boolean; callSelf: boolean }
+
+/** Messages that offered the main options (an "ok" after one of them gets a nudge, not the menu again). */
+const MENUS = new Set(["MAIN_MENU", "OTHER_HELP", "OFF_TOPIC", "RUDE_REPLY", "HELP_REPLY", "STARTED_OVER", "LANGUAGE_SET"]);
+
+/** Does the patient want to stop or leave, rather than ask for something? (A day, time, person or visit type means not.) */
+async function wantsToEnd(t: Turn, e: Extraction, f: Ending): Promise<boolean> {
+  const details = !!(e.date || e.time || e.partOfDay || e.phone || e.newPersonName || (e.relation && e.relation !== "SELF") || e.visitType);
+  if (details) return false;
+  if (f.callSelf || f.wrong) return true;
+  const s = t.conv.state;
+  // "I don't want to cancel" / "rehne do" while confirming a cancellation or deletion: keep everything.
+  if ((s === "CX_CONFIRM" || s === "CX_PICK_APPT" || s === "ERASE_CONFIRM") && (f.end || e.intent === "END")) return true;
+  // "I don't want my appointment" is a cancellation, and the other specific requests are answered as asked.
+  if (["CANCEL", "RESCHEDULE", "DELETE_DATA", "MY_DATA", "STATUS", "MY_APPOINTMENTS", "CLINIC_INFO", "ARRIVED", "CHANGE_NUMBER", "CHANGE_LANGUAGE", "START", "TALK_TO_STAFF"].includes(e.intent)) return false;
+  return e.intent === "END" || f.end;
+}
+
+/** The patient is done: drop what was in progress and say so in context (nothing booked / kept / nothing saved). */
+async function endChat(t: Turn, f: Ending): Promise<void> {
+  const s = t.conv.state;
+  if (s === "CX_CONFIRM" || s === "CX_PICK_APPT") {
+    const many = !!t.conv.cxIds?.length || s === "CX_PICK_APPT";
+    t.conv.cxApptId = undefined; t.conv.cxIds = undefined; t.conv.cxList = undefined;
+    t.set("IDLE");
+    return t.text(many ? "CX_KEPT_MANY" : "CX_KEPT");
+  }
+  if (s === "ERASE_CONFIRM") { t.set("IDLE"); return t.text("ERASE_KEPT"); }
+  const wasBooking = s.startsWith("BK_") || s === "RS_PICK_APPT" || !!t.conv.held;
+  await dropFlow(t);
+  if (f.callSelf) return callClinic(t);
+  if (f.wrong) return t.text("WRONG_NUMBER");
+  if (!(await hasConsent(t.ctx, t.acc.id))) return t.text("CLOSED_NO_CONSENT");
+  const nameJi = t.nameJi(senderName(t));
+  if (wasBooking) return t.text("BOOKING_STOPPED", { nameJi });
+  await t.send({ kind: "text", body: t.tv("CHAT_CLOSED", { nameJi }) }, "CHAT_CLOSED");
+}
+
+/** "No" to the offered times or to the final confirmation: other times, or stop here (both one tap away). */
+async function otherTimesOrStop(t: Turn): Promise<void> {
+  return t.buttons(t.t("OTHER_TIMES_OR_STOP"), "OTHER_TIMES_OR_STOP", [{ id: "see_all", title: t.b("SHOW_FREE_TIMES") }, { id: "bk:stop", title: t.b("STOP_BOOKING") }]);
+}
+
+/** "Stop booking": release the held slot and confirm nothing was booked (no menu). */
+async function stopBooking(t: Turn): Promise<void> {
+  await dropFlow(t);
+  return t.text("BOOKING_STOPPED", { nameJi: t.nameJi(senderName(t)) });
+}
+
+async function dropFlow(t: Turn): Promise<void> {
+  if (t.conv.held) { await releaseHold(t.ctx, t.conv.held); t.conv.held = undefined; }
+  t.conv.p = {};
+  t.conv.offered = undefined;
+  t.conv.requested = undefined;
+  t.conv.raceLost = false;
+  t.conv.misses = 0;
+  t.set("IDLE");
+}
+
+async function stopFlow(t: Turn, id: "STARTED_OVER" | "MAIN_MENU"): Promise<void> {
   if (t.conv.held) { await releaseHold(t.ctx, t.conv.held); t.conv.held = undefined; }
   t.conv.p = {};
   t.conv.offered = undefined;

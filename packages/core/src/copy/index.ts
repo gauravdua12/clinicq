@@ -410,9 +410,34 @@ export const COPY = {
     hinglish: "Phir se namaste 👋 Hum{{who}} booking kar rahe the. Kya continue karein?",
   },
   BOOKING_STOPPED: {
-    en: "No problem, I've stopped this booking 👍 Is there anything else I can help with?",
-    hi: "कोई बात नहीं, मैंने यह बुकिंग रोक दी है 👍 क्या कुछ और मदद करूँ?",
-    hinglish: "Koi baat nahi, maine yeh booking rok di hai 👍 Kuch aur madad karoon?",
+    en: "No problem{{nameJi}} 🙏 I've stopped the booking, and nothing has been booked. Message me anytime if you need an appointment later.",
+    hi: "कोई बात नहीं{{nameJi}} 🙏 मैंने बुकिंग रोक दी है, कोई अपॉइंटमेंट बुक नहीं हुआ। बाद में ज़रूरत हो तो कभी भी मैसेज करें।",
+    hinglish: "Koi baat nahi{{nameJi}} 🙏 Maine booking rok di hai, koi appointment book nahi hua. Baad mein zaroorat ho to kabhi bhi message karein.",
+  },
+  CHAT_CLOSED: {
+    en: ["No problem{{nameJi}} 🙏 Take care. Message me anytime if you need to book an appointment or check your turn.", "Okay{{nameJi}}, all good 🙂 I'm here whenever you need an appointment or your queue status."],
+    hi: ["कोई बात नहीं{{nameJi}} 🙏 अपना ध्यान रखिए। अपॉइंटमेंट या अपनी बारी जाननी हो तो कभी भी मैसेज करें।", "ठीक है{{nameJi}} 🙂 जब भी अपॉइंटमेंट या कतार की जानकारी चाहिए, मैं यहीं हूँ।"],
+    hinglish: ["Koi baat nahi{{nameJi}} 🙏 Apna dhyaan rakhiye. Appointment ya apni baari jaanni ho to kabhi bhi message karein.", "Theek hai{{nameJi}} 🙂 Jab bhi appointment ya queue ki jaankari chahiye, main yahin hoon."],
+  },
+  CLOSED_NO_CONSENT: {
+    en: "No problem 🙏 Nothing has been saved. If you need an appointment at {{clinicName}} later, just message me.",
+    hi: "कोई बात नहीं 🙏 कुछ भी सेव नहीं किया गया है। बाद में {{clinicName}} में अपॉइंटमेंट चाहिए तो बस मैसेज करें।",
+    hinglish: "Koi baat nahi 🙏 Kuch bhi save nahi kiya gaya hai. Baad mein {{clinicName}} mein appointment chahiye to bas message karein.",
+  },
+  WRONG_NUMBER: {
+    en: "No problem, sorry for the trouble 🙏 This is the appointment assistant for {{clinicName}}. Nothing has been booked; you can simply ignore this chat.",
+    hi: "कोई बात नहीं, परेशानी के लिए माफ़ी 🙏 यह {{clinicName}} की अपॉइंटमेंट असिस्टेंट है। कुछ भी बुक नहीं हुआ है; आप यह चैट अनदेखी कर सकते हैं।",
+    hinglish: "Koi baat nahi, pareshani ke liye sorry 🙏 Yeh {{clinicName}} ki appointment assistant hai. Kuch bhi book nahi hua hai; aap yeh chat ignore kar sakte hain.",
+  },
+  MENU_NUDGE: {
+    en: "Sure 🙂 Just tell me what you need, like \"appointment tomorrow evening\", or tap one of the options above.",
+    hi: "ज़रूर 🙂 बस बताइए आपको क्या चाहिए, जैसे \"कल शाम अपॉइंटमेंट\", या ऊपर दिए किसी विकल्प पर टैप करें।",
+    hinglish: "Zaroor 🙂 Bas bataiye kya chahiye, jaise \"kal shaam appointment\", ya upar diye kisi option par tap karein.",
+  },
+  OTHER_TIMES_OR_STOP: {
+    en: "No problem. Shall I show other free times, or stop here? You can also type a day and time.",
+    hi: "कोई बात नहीं। क्या मैं दूसरे ख़ाली समय दिखाऊँ, या यहीं रोक दूँ? आप दिन और समय लिख भी सकते हैं।",
+    hinglish: "Koi baat nahi. Dusre khaali time dikhaoon, ya yahin rok doon? Aap din aur time likh bhi sakte hain.",
   },
   STARTED_OVER: {
     en: "Okay, let's start fresh 👍 What would you like to do?",

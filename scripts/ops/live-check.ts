@@ -156,6 +156,11 @@ try {
   check("off-script: 'Stop it now' is not an unsubscribe", !k.includes("OPTED_OUT") && !(await acc2())?.optedOutAt);
   await post2({ type: "text", text: { body: "ok" } });
   check("off-script: then carries on to the menu", (await outKinds()).at(-1) === "MAIN_MENU" && !!(await acc2())?.numberConfirmedAt);
+  // Declining is answered as a close (no menu), and "close this chat" is not an unsubscribe
+  await post2({ type: "text", text: { body: "I don't want to book" } });
+  check("decline: 'I don't want to book' gets a polite close, not the menu", (await outKinds()).at(-1) === "CHAT_CLOSED", (await outKinds()).slice(-2).join(","));
+  await post2({ type: "text", text: { body: "close this chat" } });
+  check("decline: 'close this chat' closes without unsubscribing", ["CHAT_CLOSED", "ACK_CLOSING"].includes((await outKinds()).at(-1)!) && !(await acc2())?.optedOutAt);
   await post2({ type: "text", text: { body: "delete my data" } });
   await post2({ type: "interactive", interactive: { type: "button_reply", button_reply: { id: "erase:yes", title: "Yes, delete" } } });
   check("off-script check patient erased", (await acc2()) === null);
