@@ -1,0 +1,9 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "ClinicqSettings", "Effect": "Allow", "Action": ["ssm:GetParametersByPath", "ssm:GetParameter", "ssm:GetParameters"], "Resource": "arn:aws:ssm:ap-south-1:068381294079:parameter/clinicq/*" },
+    { "Sid": "ClinicqBedrockMantle", "Effect": "Allow", "Action": ["bedrock-mantle:CreateInference", "bedrock-mantle:Get*", "bedrock-mantle:List*"], "Resource": "*" },
+    { "Sid": "ClinicqVoice", "Effect": "Allow", "Action": ["bedrock:InvokeModel"], "Resource": "arn:aws:bedrock:ap-south-1::foundation-model/mistral.voxtral-*" },
+    { "Sid": "ClinicqTranscribe", "Effect": "Allow", "Action": ["transcribe:StartStreamTranscription"], "Resource": "*" }
+  ]
+}

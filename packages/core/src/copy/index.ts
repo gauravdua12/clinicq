@@ -514,14 +514,19 @@ export const COPY = {
     hinglish: "Thank you{{nameJi}}. Samajh gayi, aapko {{when}} appointment chahiye.",
   },
   VOICE_UNCLEAR: {
-    en: "Sorry, I couldn't catch that clearly. Could you type the day and time you'd like?",
-    hi: "माफ़ कीजिए, मैं ठीक से समझ नहीं पाई। क्या आप दिन और समय लिखकर बता सकते हैं?",
-    hinglish: "Sorry, theek se samajh nahi paayi. Din aur time likh kar bata denge?",
+    en: "Sorry, I couldn't catch that voice note clearly 🙏 Could you send it again, or type your message?",
+    hi: "माफ़ कीजिए, मैं यह वॉइस नोट ठीक से समझ नहीं पाई 🙏 क्या आप इसे दोबारा भेज सकते हैं, या लिखकर बता सकते हैं?",
+    hinglish: "Sorry, yeh voice note theek se samajh nahi paayi 🙏 Dobara bhej denge, ya likh kar bata denge?",
+  },
+  VOICE_UNAVAILABLE: {
+    en: "Sorry, I can't listen to voice notes right now 🙏 Please type your message instead, for example \"book tomorrow morning\" or \"cancel my appointment\".",
+    hi: "माफ़ कीजिए, अभी मैं वॉइस नोट नहीं सुन पा रही 🙏 कृपया लिखकर बताइए, जैसे \"कल सुबह अपॉइंटमेंट\" या \"मेरी अपॉइंटमेंट कैंसल करो\"।",
+    hinglish: "Sorry, abhi main voice note nahi sun pa rahi 🙏 Please likh kar bataiye, jaise \"kal subah appointment\" ya \"meri appointment cancel karo\".",
   },
   VOICE_TOO_LONG: {
-    en: "That's a long voice note 😊 Could you tell me just the day and time you'd like to come?",
-    hi: "यह लंबा वॉइस नोट है 😊 बस दिन और समय बता दीजिए जब आप आना चाहते हैं।",
-    hinglish: "Yeh lamba voice note hai 😊 Bas din aur time bata dijiye kab aana hai.",
+    en: "That's a long voice note 😊 Could you send a shorter one (under a minute), or type your message?",
+    hi: "यह लंबा वॉइस नोट है 😊 क्या आप छोटा वॉइस नोट (एक मिनट से कम) भेज सकते हैं, या लिखकर बता सकते हैं?",
+    hinglish: "Yeh lamba voice note hai 😊 Chhota voice note (ek minute se kam) bhej denge, ya likh kar bata denge?",
   },
   MAIN_MENU: {
     en: ["Hello{{nameJi}} 😊 How can I help today?", "Hi again{{nameJi}} 👋 What would you like to do?"],

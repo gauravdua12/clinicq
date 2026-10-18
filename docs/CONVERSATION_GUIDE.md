@@ -185,8 +185,9 @@ Replies: Confirm → "Thank you, see you tomorrow 😊". Reschedule/Cancel → t
 
 **MEDIA_REPORTS**: "Please bring your reports with you to the clinic. Doctor will review them during the consultation 😊"
 **VOICE_BOOKING_UNDERSTOOD**: "Thank you, {{name}} ji. I understood you'd like an appointment for {{when}}." (+ HEALTH_DETAILS_REDIRECT v-short if flagged: "Any health concerns are best discussed with Doctor during your visit, so I haven't saved those.") (+ offers)
-**VOICE_UNCLEAR**: "Sorry, I couldn't catch that clearly. Could you type the day and time you'd like?"
-**VOICE_TOO_LONG** (>2 min): "That's a long voice note 😊 Could you tell me just the day and time you'd like to come?"
+**VOICE_UNCLEAR** (heard, not understood): "Sorry, I couldn't catch that voice note clearly 🙏 Could you send it again, or type your message?" (+ the pending question again, or the options)
+**VOICE_UNAVAILABLE** (speech-to-text down): "Sorry, I can't listen to voice notes right now 🙏 Please type your message instead, for example "book tomorrow morning" or "cancel my appointment"." (+ the pending question again, or the options)
+**VOICE_TOO_LONG** (>2 min): "That's a long voice note 😊 Could you send a shorter one (under a minute), or type your message?"
 
 ### 6.8 General
 **MAIN_MENU** (GREETING by a known patient): "Hello {{name}} ji 😊 How can I help today?" Buttons: [Book appointment] [My appointments] [Queue status]

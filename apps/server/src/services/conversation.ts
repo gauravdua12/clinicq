@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { decrypt, displayPhone, encrypt, normalizeIndianPhone, phoneHash, type PatientAccount, type VisitType, type Relation } from "@clinicq/db";
 import { copy as C, safety, slots as S, time as T } from "@clinicq/core";
 import { CALL_SELF_RE, END_RE, extract, WRONG_RE, type Extraction, type ExtractContext } from "@clinicq/core/extract/index";
+import { sttUnavailable } from "@clinicq/ai/stt";
 import type { Button, InboundMessage, ListSection, OutMsg } from "@clinicq/wa";
 import type { Ctx } from "../context";
 import { activeCountForProfile, cancelAppointment, confirmHold, FamilySlotError, holdSlot, releaseHold, reschedule, SlotTakenError, upcomingForAccount, type UpcomingView } from "./booking";
@@ -220,7 +221,11 @@ async function route(t: Turn, msg: InboundMessage): Promise<void> {
   let isVoice = false;
   if (msg.kind === "audio") {
     const tr = await transcribeVoice(t, msg.mediaId);
-    if (tr.kind !== "ok") return t.text(tr.kind === "too_long" ? "VOICE_TOO_LONG" : "VOICE_UNCLEAR");
+    if (tr.kind !== "ok") {
+      // Say what happened, then show the pending question or the options again so the patient can tap or type.
+      await t.text(tr.kind === "too_long" ? "VOICE_TOO_LONG" : tr.kind === "unavailable" ? "VOICE_UNAVAILABLE" : "VOICE_UNCLEAR");
+      return reprompt(t);
+    }
     text = tr.text;
     isVoice = true;
   }
@@ -229,7 +234,11 @@ async function route(t: Turn, msg: InboundMessage): Promise<void> {
   await onText(t, text, isVoice);
 }
 
-type VoiceResult = { kind: "ok"; text: string } | { kind: "unclear" } | { kind: "too_long" };
+type VoiceResult = { kind: "ok"; text: string } | { kind: "unclear" } | { kind: "unavailable" } | { kind: "too_long" };
+
+/** Speech-to-text services that failed for a reason retrying won't fix (no quota, no subscription…): skipped for a while. */
+const sttDownUntil = new Map<string, number>();
+const STT_DOWN_MS = 10 * 60_000;
 
 async function transcribeVoice(t: Turn, mediaId?: string): Promise<VoiceResult> {
   if (!mediaId) return { kind: "unclear" };
@@ -237,13 +246,23 @@ async function transcribeVoice(t: Turn, mediaId?: string): Promise<VoiceResult> 
   try {
     const m = await t.ctx.wa.downloadMedia(mediaId, 5 * 1024 * 1024);
     audio = m.data;
+    const now = t.ctx.clock.now().getTime();
+    let heard = false; // some service listened (even if it caught nothing useful)
     for (const stt of await t.ctx.stt()) {
+      if ((sttDownUntil.get(stt.name) ?? 0) > now) continue;
       try {
         const r = await stt.transcribe(audio, m.mime, 8000);
+        sttDownUntil.delete(stt.name);
+        heard = true;
         if (r.text.split(/\s+/).filter(Boolean).length >= 2 && (r.confidence == null || r.confidence >= 0.6)) return { kind: "ok", text: r.text };
-      } catch (e) { t.ctx.log.warn({ err: e, stt: stt.name }, "stt_failed"); }
+      } catch (e) {
+        const down = sttUnavailable(e);
+        if (down) sttDownUntil.set(stt.name, now + STT_DOWN_MS);
+        t.ctx.log.warn({ err: e, stt: stt.name, down }, "stt_failed");
+      }
     }
-    return { kind: "unclear" };
+    if (!heard) t.ctx.log.warn({}, "stt_unavailable"); // every speech service is down: alert on this log line
+    return { kind: heard ? "unclear" : "unavailable" };
   } catch (e) {
     return (e as { status?: number }).status === 413 ? { kind: "too_long" } : { kind: "unclear" };
   } finally {

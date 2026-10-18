@@ -1,5 +1,5 @@
 import { StartStreamTranscriptionCommand, TranscribeStreamingClient, type LanguageCode } from "@aws-sdk/client-transcribe-streaming";
-import { mantlePost } from "./providers";
+import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 
 // Speech-to-text for voice notes (docs/AI_EXTRACTION.md §6). Audio stays in memory; nothing is stored.
 
@@ -117,22 +117,35 @@ async function oggToWav(audio: Buffer): Promise<Buffer> {
   }
 }
 
-/** Voxtral speech understanding via Mantle chat completions with audio input; returns the verbatim transcript. */
+const VOXTRAL_PROMPT = "Transcribe this audio exactly, in its original language and script (Hindi in Devanagari, Hinglish in Roman script). Output only the transcript.";
+
+/**
+ * Voxtral speech understanding via the Bedrock Converse API (audio block, WAV; the Mantle endpoint no longer takes audio).
+ * Needs bedrock:InvokeModel on the Voxtral models and an on-demand quota above 0 (zero on AWS Free-plan accounts).
+ */
 export function voxtral(model: string, region: string): SpeechToText {
+  const client = new BedrockRuntimeClient({ region, maxAttempts: 1 });
   return {
     name: `voxtral:${model}`,
     async transcribe(audio, mime, timeoutMs) {
       const wav = /ogg|opus/i.test(mime) ? await oggToWav(audio) : audio;
-      const j = await mantlePost(region, "/v1/chat/completions", {
-        model, temperature: 0, max_tokens: 300,
-        messages: [{ role: "user", content: [
-          { type: "input_audio", input_audio: { data: wav.toString("base64"), format: "wav" } },
-          { type: "text", text: "Transcribe this audio exactly, in its original language and script (Hindi in Devanagari, Hinglish in Roman script). Output only the transcript." },
-        ] }],
-      }, timeoutMs) as { choices?: { message?: { content?: string } }[] };
-      return { text: String(j.choices?.[0]?.message?.content ?? "").trim() };
+      const res = await client.send(new ConverseCommand({
+        modelId: model,
+        inferenceConfig: { temperature: 0, maxTokens: 300 },
+        messages: [{ role: "user", content: [{ audio: { format: "wav", source: { bytes: wav } } }, { text: VOXTRAL_PROMPT }] }],
+      }), { abortSignal: AbortSignal.timeout(timeoutMs) });
+      return { text: (res.output?.message?.content ?? []).map((c) => c.text ?? "").join("").trim() };
     },
   };
+}
+
+/** A failure that won't go away by retrying the next voice note (quota 0 / daily cap, no subscription, no permission, bad request). */
+export function sttUnavailable(e: unknown): boolean {
+  const x = e as { name?: string; message?: string; status?: number; $metadata?: { httpStatusCode?: number } };
+  const status = x.status ?? x.$metadata?.httpStatusCode;
+  return /SubscriptionRequired|AccessDenied|ValidationException|ResourceNotFound|UnrecognizedClient|ExpiredToken|CredentialsProvider/i.test(x.name ?? "")
+    || /per day|subscription|not authorized|does not support/i.test(x.message ?? "")
+    || status === 400 || status === 401 || status === 403 || status === 404;
 }
 
 /** Dev/test: the simulator registers the "spoken" text for a media id. */

@@ -69,7 +69,7 @@ Chosen by the bake-off in **docs/MODEL_SELECTION.md** (14 Mumbai models, 210 cas
 ```
 EXTRACTOR_PRIMARY=bedrock-mantle:qwen.qwen3-32b                              # open-weight, Mumbai, p50 ~360 ms
 EXTRACTOR_ESCALATION=bedrock-mantle:mistral.mistral-large-3-675b-instruct    # open-weight, Mumbai, strongest tested
-STT_PROVIDER=voxtral-small   STT_FALLBACK=voxtral-mini
+STT_PROVIDER=voxtral-small   STT_FALLBACK=transcribe
 AWS_REGION=ap-south-1
 ```
 The admin can change these at runtime (Settings → Language model). `bedrock-mantle:` is the Bedrock OpenAI-compatible endpoint (`bedrock-mantle.<region>.api.aws`, SigV4).
@@ -134,6 +134,8 @@ Add ~15 few-shot examples (from §7) as a stable block after the rules. Version 
 ## 6. Speech-to-text (voice notes)
 - Interface: `SpeechToText.transcribe(audio: Buffer, mime: "audio/ogg", hint?: Lang): Promise<{text: string, lang?: string, confidence?: number}>`. WhatsApp voice notes are OGG/Opus.
 - **Default on AWS: Amazon Transcribe streaming** (`@aws-sdk/client-transcribe-streaming`, region `ap-south-1`). It takes `ogg-opus` media encoding directly (no conversion), and uses language identification over `en-IN, hi-IN`. Audio is streamed from the in-memory Buffer. AI-services opt-out: set the AWS Organizations AI services opt-out policy so content isn't stored or used to improve the service.
+- **Live setup (Oct 2026):** `STT_PROVIDER=voxtral-small` (Mistral Voxtral on Bedrock Mumbai, via the **Converse** API with a WAV audio block decoded in memory; the Mantle endpoint stopped accepting audio), `STT_FALLBACK=transcribe`. Both need an AWS account on a **paid plan**: on the Free plan the Voxtral on-demand quota is 0 ("Too many tokens per day") and Transcribe returns `SubscriptionRequiredException`. The instance role needs `bedrock:InvokeModel` on `mistral.voxtral-*` and `transcribe:StartStreamTranscription` (`deploy/iam-clinicq-voice.json`). Check any account with `npx tsx scripts/ops/probe-stt.ts note.ogg`.
+- **When speech-to-text is down:** a service that fails for a reason retrying won't fix (no quota, no subscription, no permission, rejected request) is skipped for 10 minutes, so the patient isn't kept waiting. If no service could listen, the patient gets `VOICE_UNAVAILABLE` ("please type…") at once, then the pending question or the options; the log line `stt_unavailable` is the alert. A note that was heard but not understood gets `VOICE_UNCLEAR`, then the pending question.
 - **Quality guard:** if Transcribe's confidence is low (average < 0.6) or the transcript has fewer than 2 words, and `STT_FALLBACK` is configured, retry once with the fallback provider. Otherwise reply `VOICE_UNCLEAR`.
 - Adapters: `transcribe` (default), `sarvam` (Sarvam AI, strong on Hinglish and code-mixed speech; India-hosted), `openai-compat` (self-hosted **Whisper / faster-whisper** server, the open-source option), `mock`.
 - Choose by eval: record 30 real Hinglish voice samples (staff volunteers, no health content) and compare word accuracy for dates, times and names.
