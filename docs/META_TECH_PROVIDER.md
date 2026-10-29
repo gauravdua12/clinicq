@@ -53,6 +53,7 @@ Meta asks how the business uses other businesses' data. Suggested answer:
 > Incolo Systems provides Q-Incolo, software that clinics use to manage appointments and patient queues on their own WhatsApp Business numbers. With each clinic's permission (given in Embedded Signup), we use its WhatsApp Business Account to send and receive appointment messages for that clinic and to manage its utility templates. We use the data only to provide the service to that clinic, store it in India, never sell it or use it for advertising, and delete it when the clinic disconnects.
 
 ## 5. Live mode and Facebook Login for Business
+**Status (30 Oct 2026):** App Review approved (whatsapp_business_messaging, whatsapp_business_management, public_profile). Configuration **1454298736672568** "Q-Incolo Signup" (WhatsApp Embedded Signup, WhatsApp Cloud API only, system-user token, never expires, the 5 WhatsApp tasks). Delete the earlier configuration 2536031243541221 (it also asked for Marketing Messages and ads/Pages permissions). Still to do: Access Verification (if not verified) and Publish (Live).
 - Switch App Mode to **Live** (needs the contact email, privacy and terms URLs).
 - Facebook Login for Business → create a configuration for **WhatsApp Embedded Signup** (version 4): token expiry **Never**; assets: WhatsApp accounts with MANAGE, MANAGE_TEMPLATES, MESSAGING, VIEW_PHONE_ASSETS, VIEW_TEMPLATES.
 - Login settings: Client OAuth, Web OAuth, Enforce HTTPS, Strict mode, JavaScript SDK login on; add the Q-Incolo domain to Allowed Domains and Valid OAuth Redirect URIs.

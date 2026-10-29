@@ -61,6 +61,8 @@ export type InboundKind = "text" | "button" | "flow" | "audio" | "media" | "loca
 
 export interface InboundMessage {
   wamid: string;
+  /** The business number it was sent to (metadata.phone_number_id): which clinic it's for. */
+  phoneNumberId?: string;
   from: string; // wa_id digits
   profileName?: string;
   timestamp?: number;
@@ -84,8 +86,9 @@ export function parseWebhook(json: unknown): { messages: InboundMessage[]; statu
   for (const e of p.data.entry) for (const c of e.changes) {
     const v = c.value;
     const names = new Map((v.contacts ?? []).map((k) => [k.wa_id, k.profile?.name]));
+    const phoneNumberId = v.metadata?.phone_number_id;
     for (const m of v.messages ?? []) {
-      const base = { wamid: m.id, from: m.from, profileName: names.get(m.from) ?? undefined, timestamp: m.timestamp ? Number(m.timestamp) : undefined };
+      const base = { wamid: m.id, phoneNumberId, from: m.from, profileName: names.get(m.from) ?? undefined, timestamp: m.timestamp ? Number(m.timestamp) : undefined };
       if (m.type === "text" && m.text) messages.push({ ...base, kind: "text", text: m.text.body });
       else if (m.type === "interactive" && m.interactive?.button_reply) messages.push({ ...base, kind: "button", buttonId: m.interactive.button_reply.id, buttonTitle: m.interactive.button_reply.title });
       else if (m.type === "interactive" && m.interactive?.list_reply) messages.push({ ...base, kind: "button", buttonId: m.interactive.list_reply.id, buttonTitle: m.interactive.list_reply.title });
@@ -106,12 +109,12 @@ export function parseWebhook(json: unknown): { messages: InboundMessage[]; statu
 }
 
 /** Build a Meta-format webhook body (used by the simulator and tests). */
-export function buildWebhook(opts: { from: string; name?: string; wamid: string; message: Record<string, unknown> }): Record<string, unknown> {
+export function buildWebhook(opts: { from: string; name?: string; wamid: string; message: Record<string, unknown>; phoneNumberId?: string }): Record<string, unknown> {
   return {
     object: "whatsapp_business_account",
     entry: [{ id: "WABA", changes: [{ field: "messages", value: {
       messaging_product: "whatsapp",
-      metadata: { phone_number_id: "PNID" },
+      metadata: { phone_number_id: opts.phoneNumberId ?? "PNID" },
       contacts: [{ wa_id: opts.from, profile: { name: opts.name ?? "" } }],
       messages: [{ id: opts.wamid, from: opts.from, timestamp: String(Math.floor(Date.now() / 1000)), ...opts.message }],
     } }] }],

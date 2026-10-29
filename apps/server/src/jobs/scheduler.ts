@@ -1,10 +1,17 @@
 import type { Db } from "@clinicq/db";
 import type { Logger } from "@clinicq/core";
 import type { Clock } from "../clock";
+import { currentScope, inScope } from "../scope";
 
 // Postgres-backed scheduler (ScheduledJob table). Job payloads hold IDs only — never message text.
 
 export type JobHandler = (data: Record<string, unknown>) => Promise<void>;
+
+/** Remember the clinic scope (src/scope.ts) in the payload: a clinic id, never patient data. */
+function withScope(data: Record<string, unknown>): Record<string, unknown> {
+  const { clinicId } = currentScope();
+  return clinicId ? { ...data, clinicScope: clinicId } : data;
+}
 
 export class Scheduler {
   private handlers = new Map<string, JobHandler>();
@@ -17,8 +24,9 @@ export class Scheduler {
   on(name: string, h: JobHandler): void { this.handlers.set(name, h); }
   onTick(h: () => Promise<void>): void { this.tickHooks.push(h); }
 
-  /** Upsert by key: rescheduling the same key replaces the pending job. */
+  /** Upsert by key: rescheduling the same key replaces the pending job. The job runs in the clinic scope it was made in. */
   async schedule(name: string, data: Record<string, unknown>, runAt: Date, key?: string): Promise<void> {
+    data = withScope(data);
     if (key) {
       await this.db.scheduledJob.upsert({ where: { key }, create: { name, data: data as never, runAt, key }, update: { name, data: data as never, runAt, doneAt: null } });
     } else {
@@ -28,6 +36,7 @@ export class Scheduler {
 
   /** Schedule only if no job with this key exists yet (idempotent daily jobs). */
   async ensure(name: string, data: Record<string, unknown>, runAt: Date, key: string): Promise<void> {
+    data = withScope(data);
     await this.db.scheduledJob.upsert({ where: { key }, create: { name, data: data as never, runAt, key }, update: {} });
   }
 
@@ -56,7 +65,8 @@ export class Scheduler {
         for (const r of rows) {
           const h = this.handlers.get(r.name);
           if (!h) { this.log.warn({ job: r.name }, "no_handler"); continue; }
-          try { await h(r.data); n++; } catch (e) { this.log.error({ err: e, job: r.name }, "job_failed"); }
+          const clinicId = typeof r.data?.clinicScope === "string" ? r.data.clinicScope : null;
+          try { await inScope({ clinicId }, () => h(r.data)); n++; } catch (e) { this.log.error({ err: e, job: r.name }, "job_failed"); }
         }
       }
     } finally {

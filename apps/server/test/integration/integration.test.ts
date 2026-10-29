@@ -87,7 +87,7 @@ describe("WhatsApp Flow data endpoint", () => {
     const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048, publicKeyEncoding: { type: "spki", format: "pem" }, privateKeyEncoding: { type: "pkcs8", format: "pem" } });
     h.ctx.flowKey = createPrivateKeyForTest(privateKey);
     await onboard(h);
-    const acc = await h.db.patientAccount.findUniqueOrThrow({ where: { phoneHash: phoneHash(PATIENT) } });
+    const acc = await h.db.patientAccount.findFirstOrThrow({ where: { phoneHash: phoneHash(PATIENT) } });
     const prof = await createProfile(h.ctx, acc.id, "Ramesh Kumar", "SELF");
     const token = randomUUID();
     await h.db.flowToken.create({ data: { token, accountId: acc.id, profileId: prof.id, expiresAt: new Date("2026-10-09T13:00:00+05:30") } });

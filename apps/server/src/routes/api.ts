@@ -11,6 +11,9 @@ import { audit, sendToAccount } from "../services/notify";
 import { createProfile, findOrCreateAccount, firstName } from "../services/patients";
 import * as Q from "../services/queue";
 import * as R from "../services/reminders";
+import { clinicWaNumber } from "../services/whatsapp";
+import { createCustomerClinic, CustomerError, listCustomerClinics } from "../services/customers";
+import * as ES from "../services/embeddedSignup";
 import { decideOverflow, walkinLink } from "../services/walkin";
 import { ClinicSettings } from "../settings";
 import { activateDemo, createDemo, deleteDemo, extractProfile, resetDemo, type ClinicProfile } from "../services/demo";
@@ -31,10 +34,34 @@ async function wrapQueue(reply: FastifyReply, fn: () => Promise<unknown>) {
 export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): Promise<void> {
   const actorOf = (s: { id: string; role: string }) => ({ type: s.role, id: s.id });
 
+  // Several clinics share this server (src/scope.ts): an id in the URL must belong to the signed-in staff's clinic.
+  // Anything else answers 404, exactly as if it didn't exist.
+  const OWNED: [RegExp, (id: string) => Promise<string | null | undefined>][] = [
+    [/^\/api\/queue\/([^/]+)\/(no-show|cancel|re-add|undo|move)$/, async (id) => (await ctx.db.queueEntry.findUnique({ where: { id }, select: { doctorId: true } }))?.doctorId],
+    [/^\/api\/overflow\/([^/]+)\/decide$/, async (id) => (await ctx.db.walkinOverflowRequest.findUnique({ where: { id }, select: { doctorId: true } }))?.doctorId],
+    [/^\/api\/appointments\/([^/]+)\/(arrive|cancel|reschedule)$/, async (id) => (await ctx.db.appointment.findUnique({ where: { id }, select: { doctorId: true } }))?.doctorId],
+    [/^\/api\/settings\/closures\/([^/]+)$/, async (id) => (await ctx.db.closure.findUnique({ where: { id }, select: { doctorId: true } }))?.doctorId],
+  ];
+  app.addHook("preHandler", async (req, reply) => {
+    const path = req.url.slice(ctx.env.BASE_PATH.length).split("?")[0]!;
+    if (req.method === "PATCH" && /^\/api\/settings\/staff\/[^/]+$/.test(path)) {
+      const staff = await ctx.db.staffUser.findUnique({ where: { id: path.split("/").pop()! }, select: { clinicId: true } });
+      if (staff && staff.clinicId !== (await clinicInfo(ctx)).clinic.id) return sendErr(reply, 404, "not_found");
+      return;
+    }
+    for (const [re, doctorOf] of OWNED) {
+      const m = path.match(re);
+      if (!m) continue;
+      const doctorId = await doctorOf(decodeURIComponent(m[1]!));
+      if (doctorId && doctorId !== (await clinicInfo(ctx)).doctor.id) return sendErr(reply, 404, "not_found");
+      return;
+    }
+  });
+
   app.get("/api/clinic", async (req, reply) => {
     if (!(await requireStaff(ctx, req, reply))) return;
     const info = await clinicInfo(ctx);
-    return { name: info.clinic.name, isDemo: info.clinic.isDemo, doctor: info.doctor.displayName, demoStudio: ctx.env.DEMO_STUDIO, today: nowLocal(ctx).date };
+    return { name: info.clinic.name, isDemo: info.clinic.isDemo, ownNumber: info.clinic.ownNumber, doctor: info.doctor.displayName, demoStudio: ctx.env.DEMO_STUDIO, today: nowLocal(ctx).date };
   });
 
   // ── queue ──
@@ -317,10 +344,52 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
   });
   app.get("/api/settings/qr", async (req, reply) => {
     if (!(await requireStaff(ctx, req, reply))) return;
-    const link = await walkinLink(ctx, ctx.env.WA_DISPLAY_NUMBER || "910000000000");
+    const link = await walkinLink(ctx, await clinicWaNumber(ctx));
     return { ...link, png: await QRCode.toDataURL(link.url, { margin: 1, width: 512 }) };
   });
   app.get("/api/settings/display-key", async (req, reply) => { if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return; return { key: (await clinicInfo(ctx)).clinic.displayKey }; });
+
+  // ── The clinic's own WhatsApp number (customer clinics; doctor only) ──
+  const waView = async () => {
+    const info = await clinicInfo(ctx);
+    const c = await ctx.db.waConnection.findUnique({ where: { clinicId: info.clinic.id } });
+    return {
+      ownNumber: info.clinic.ownNumber, signup: ES.signupConfig(ctx),
+      connection: c && c.status === "CONNECTED" ? { displayPhone: c.displayPhone, verifiedName: c.verifiedName, connectedBy: c.connectedBy, connectedAt: c.connectedAt.toISOString(), checkedAt: c.checkedAt?.toISOString() ?? null, health: c.health } : null,
+    };
+  };
+  const signupErr = (reply: FastifyReply, e: unknown) => {
+    if (e instanceof ES.SignupError) { ctx.log.warn({ code: e.code, detail: e.detail }, "whatsapp_signup_failed"); return sendErr(reply, 400, e.code); }
+    throw e;
+  };
+  app.get("/api/whatsapp", async (req, reply) => { if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return; return waView(); });
+  app.post("/api/whatsapp/connect", async (req, reply) => {
+    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
+    const b = z.object({ code: z.string().min(10).max(2000), wabaId: z.string().regex(/^\d{5,30}$/), phoneNumberId: z.string().regex(/^\d{5,30}$/), connectedBy: z.string().max(80).optional(), coexistence: z.boolean().optional() }).safeParse(req.body);
+    if (!b.success) return sendErr(reply, 400, "bad_request");
+    try { const r = await ES.connectWhatsApp(ctx, { ...b.data, connectedBy: b.data.connectedBy ?? s.name }, s.id); return { ...(await waView()), problems: r.problems }; } catch (e) { return signupErr(reply, e); }
+  });
+  app.post("/api/whatsapp/check", async (req, reply) => {
+    if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return;
+    try { await ES.checkConnection(ctx); return waView(); } catch (e) { return signupErr(reply, e); }
+  });
+  app.post("/api/whatsapp/templates", async (req, reply) => {
+    if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return;
+    try { return await ES.submitTemplates(ctx); } catch (e) { return signupErr(reply, e); }
+  });
+  app.post("/api/whatsapp/disconnect", async (req, reply) => {
+    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
+    await ES.disconnectWhatsApp(ctx, s.id); return waView();
+  });
+
+  // ── Customer clinics on their own WhatsApp numbers (Incolo admins) ──
+  app.get("/api/admin/clinics", async (req, reply) => { if (!(await requireIncoloAdmin(ctx, req, reply))) return; return listCustomerClinics(ctx); });
+  app.post("/api/admin/clinics", async (req, reply) => {
+    const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
+    const b = z.object({ clinicName: z.string().trim().min(2).max(80), doctorName: z.string().trim().min(2).max(60), doctorPhone: z.string().max(20), addressShort: z.string().trim().min(2).max(80), clinicPhone: z.string().trim().min(6).max(20) }).safeParse(req.body);
+    if (!b.success) return sendErr(reply, 400, "bad_request");
+    try { return await createCustomerClinic(ctx, b.data, s.id); } catch (e) { if (e instanceof CustomerError) return sendErr(reply, 400, e.code); throw e; }
+  });
 
   // ── Demo Studio (operator/admin; enabled with DEMO_STUDIO=true) ──
   const DemoIn = z.object({ name: z.string().trim().min(2).max(80), website: z.string().trim().max(300).optional().or(z.literal("")), details: z.string().max(8000).optional(), doctorName: z.string().max(60).optional(), specialty: z.string().max(60).optional() });
@@ -331,7 +400,7 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
   app.get("/api/demo", async (req, reply) => {
     if (!(await demoGuard(req, reply))) return;
     const active = (await clinicInfo(ctx)).clinic.id;
-    const rows = await ctx.db.clinic.findMany({ orderBy: { createdAt: "desc" }, include: { doctors: true } });
+    const rows = await ctx.db.clinic.findMany({ where: { ownNumber: false }, orderBy: { createdAt: "desc" }, include: { doctors: true } });
     return rows.map((c) => ({ id: c.id, name: c.name, isDemo: c.isDemo, active: c.id === active, doctor: c.doctors[0]?.displayName ?? "", addressShort: c.addressShort, createdAt: c.createdAt.toISOString(), source: c.demoSource }));
   });
   app.post("/api/demo/preview", async (req, reply) => {
@@ -348,8 +417,8 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
     const r = await createDemo(ctx, { ...b.data.input, website: b.data.input.website || undefined }, s.id, b.data.profile as Partial<ClinicProfile> | undefined);
     return { id: r.clinic.id, name: r.clinic.name, profile: r.profile };
   });
-  app.post("/api/demo/:id/activate", async (req, reply) => { const s = await demoGuard(req, reply); if (!s) return; await activateDemo(ctx, (req.params as { id: string }).id, s.id); return { ok: true }; });
-  app.post("/api/demo/:id/reset", async (req, reply) => { const s = await demoGuard(req, reply); if (!s) return; await resetDemo(ctx, (req.params as { id: string }).id, s.id); return { ok: true }; });
+  app.post("/api/demo/:id/activate", async (req, reply) => { const s = await demoGuard(req, reply); if (!s) return; try { await activateDemo(ctx, (req.params as { id: string }).id, s.id); return { ok: true }; } catch { return sendErr(reply, 409, "not_demo"); } });
+  app.post("/api/demo/:id/reset", async (req, reply) => { const s = await demoGuard(req, reply); if (!s) return; try { await resetDemo(ctx, (req.params as { id: string }).id, s.id); return { ok: true }; } catch { return sendErr(reply, 409, "not_demo"); } });
   app.delete("/api/demo/:id", async (req, reply) => {
     const s = await demoGuard(req, reply); if (!s) return;
     try { await deleteDemo(ctx, (req.params as { id: string }).id, s.id); return { ok: true }; } catch { return sendErr(reply, 409, "not_demo"); }
@@ -357,7 +426,7 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
   app.get("/api/demo/kit", async (req, reply) => {
     if (!(await demoGuard(req, reply))) return;
     const info = await clinicInfo(ctx);
-    const num = ctx.env.WA_DISPLAY_NUMBER || "910000000000";
+    const num = await clinicWaNumber(ctx);
     const chatUrl = `https://wa.me/${num}?text=${encodeURIComponent("Hi")}`;
     const walk = await walkinLink(ctx, num);
     const base = `${ctx.env.PUBLIC_BASE_URL}${ctx.env.BASE_PATH}`;

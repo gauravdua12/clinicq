@@ -290,3 +290,8 @@ button.bk-date:focus-visible, button.bk-slot:focus-visible, button.bk-visit:focu
 .rem-acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
 .rem-acts:empty { display: none; }
 @media (min-width: 760px) { .rem-row { grid-template-columns: 1fr auto auto; } .rem-acts { grid-column: auto; justify-content: flex-end; } }
+
+/* Settings → WhatsApp: the connected number's status. */
+.wa-health { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 12px 0; }
+.wa-health dt { color: var(--muted); }
+.wa-health dd { margin: 0; font-weight: 600; }

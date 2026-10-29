@@ -49,16 +49,15 @@ Sources: Meta's [Embedded Signup v4](https://developers.facebook.com/blog/post/2
 
 **During a demo**, patients see the display name "ClinicQ Demo", and the bot's messages use the demo clinic's name ("Sanjeevani Child Care Clinic"). One demo is active at a time. Switch the active demo in Demo Studio before each meeting.
 
-## C. A customer's own number (recommended for live clinics; about 15 minutes with the doctor)
-Uses **Embedded Signup**: the customer owns the WABA (in their own Meta portfolio), Incolo gets access as Tech Provider, and the customer pays Meta directly.
-1. Send the doctor the onboarding link (*"Connect WhatsApp"* button, served from ClinicQ settings in the onboarding build).
-2. The doctor logs in with Facebook → creates or picks their **business portfolio** (clinic name and address) → adds the **clinic number**.
-   - Already on the WhatsApp Business app: choose **coexistence** (keeps the app, history and contacts).
-   - New SIM: verify by SMS or voice.
-3. **Display name** = the clinic's name ("Dr. Sharma's Clinic"). It's approved against the customer's own business, so it matches.
-4. The doctor adds a **payment method** in their WhatsApp account. Utility messages cost ₹0.145 each; replies within 24 hours are free.
-5. ClinicQ receives the WABA ID and phone number ID from the signup callback, then runs `register`, `subscribe`, `templates` and `flow` automatically. These are the same calls as in step B5.
-6. **Business verification** of the clinic raises the limit to 2,000 business-initiated messages a day. Until then the limit is 250 a day, which is still enough for about 60 patients a day.
+## C. A customer's own number (recommended for live clinics; about 15 minutes with the doctor) — built Oct 2026
+Uses **Embedded Signup**: the customer owns the WABA (in their own Meta portfolio), Incolo gets access as Tech Provider, and the customer pays Meta directly. Facebook Login for Business configuration: **1454298736672568** (WhatsApp Cloud API only; env `META_ES_CONFIG_ID`).
+1. **Incolo admin:** Demo Studio → *Customer clinics* → add the clinic (name, doctor's name and WhatsApp number, clinic phone, short address). It starts with Mon–Sat 10–1 and 5–8 sessions.
+2. **Doctor:** signs in at https://q.incolo.si/login with their WhatsApp number, checks Settings → Clinic and Sessions, then Settings → **WhatsApp** → **Connect WhatsApp** (or *I use the WhatsApp Business app on this number* for coexistence).
+3. In Meta's pop-up the doctor logs in with Facebook → creates or picks their **business portfolio** → adds and verifies the **clinic number** (SMS or call). **Display name** = the clinic's name.
+4. Q-Incolo then, by itself: exchanges the code for the clinic's token (encrypted), checks the number, subscribes the account to our webhook, registers the number (two-step PIN kept encrypted), and submits all templates (EN + HI) for approval. Settings → WhatsApp shows display-name status, quality, messaging limit and template approvals (*Check status*, *Send missing templates*, *Disconnect*).
+5. The doctor adds a **payment method** in WhatsApp Manager. Utility messages cost about ₹0.145 each; replies within 24 hours are free.
+6. **Business verification** of the clinic raises the limit to 2,000 business-initiated messages a day. Until then the limit is 250 a day, which is enough for about 60 patients a day.
+- Until the number is connected, the doctor's login code comes from the shared Q-Incolo number; afterwards from the clinic's own number.
 
 ## D. Numbers Incolo provides, pre-onboarded for speed
 Use this when the doctor doesn't want to use their own number, or wants to start the same day. There are two models:

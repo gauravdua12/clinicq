@@ -5,6 +5,8 @@ import { copy, extract } from "@clinicq/core";
 import type { Ctx } from "../context";
 import { sendTo } from "../services/notify";
 import { handleInbound, ErasedSignal } from "../services/conversation";
+import { scopeForNumber } from "../services/tenancy";
+import { currentChannel, inScope } from "../scope";
 
 // WhatsApp webhook (docs/WHATSAPP_INTEGRATION.md §2). Messages are processed in memory, per sender in
 // order; raw text never reaches the job queue or the database.
@@ -53,6 +55,13 @@ export function processSerially(from: string, fn: () => Promise<void>): Promise<
 }
 
 export async function ingest(ctx: Ctx, msg: InboundMessage): Promise<boolean> {
+  // Which clinic's number it was sent to (src/scope.ts); a disconnected clinic's number is no longer ours to answer.
+  const scope = await scopeForNumber(ctx, msg.phoneNumberId);
+  if (scope === "ignore") { ctx.log.warn({ kind: msg.kind }, "inbound_for_disconnected_number"); return false; }
+  return inScope(scope, () => ingestScoped(ctx, msg));
+}
+
+async function ingestScoped(ctx: Ctx, msg: InboundMessage): Promise<boolean> {
   try {
     await ctx.db.processedMessage.create({ data: { wamid: msg.wamid } });
   } catch (e) {
@@ -61,7 +70,7 @@ export async function ingest(ctx: Ctx, msg: InboundMessage): Promise<boolean> {
   }
   if (rateLimited(ctx, msg.from, ctx.clock.now().getTime())) { ctx.log.warn({ kind: msg.kind }, "rate_limited"); return false; }
   if (await staleRedelivery(ctx, msg)) return false;
-  await processSerially(msg.from, async () => {
+  await processSerially(`${currentChannel()}:${msg.from}`, async () => {
     try { await handleInbound(ctx, msg); } catch (e) { if (!(e instanceof ErasedSignal)) ctx.log.error({ err: e }, "inbound_failed"); }
   });
   return true;

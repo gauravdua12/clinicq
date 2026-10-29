@@ -57,6 +57,7 @@ npm run build && npm start
 ```
 
 ## Conventions
+- **Several clinics share one server** (the demo number plus customer clinics on their own numbers): work runs in a clinic scope (`apps/server/src/scope.ts`, docs/ARCHITECTURE.md §3.5). Never query patients or staff across clinics; never add a server-wide delete or update without a clinic or channel filter.
 - Domain logic goes in `packages/core` as pure functions that take `now` and data as arguments. That makes it deterministic and testable. No `Date.now()` inside core.
 - Every state change to an Appointment or QueueEntry goes through one service function, which writes an `AuditLog` row and emits an SSE event.
 - DB writes that allocate a slot or token use a transaction. Slot uniqueness is enforced by the `Appointment.slotKey` unique column (see `docs/SCHEMA.md`). Never check-then-insert without the constraint.

@@ -1,13 +1,15 @@
 import { decrypt, encrypt, phoneHash, type PatientAccount, type PatientProfile } from "@clinicq/db";
 import type { extract as X } from "@clinicq/core";
 import type { Ctx } from "../context";
+import { currentChannel } from "../scope";
 
-// Patient identity: account = WhatsApp number; profiles = family members. Logistics only.
+// Patient identity: account = WhatsApp number (per clinic number, src/scope.ts); profiles = family members. Logistics only.
 
 export async function findOrCreateAccount(ctx: Ctx, waId: string, profileName?: string): Promise<PatientAccount> {
   const hash = phoneHash(waId);
   const now = ctx.clock.now();
-  const existing = await ctx.db.patientAccount.findUnique({ where: { phoneHash: hash } });
+  const channel = currentChannel();
+  const existing = await ctx.db.patientAccount.findUnique({ where: { channel_phoneHash: { channel, phoneHash: hash } } });
   if (existing) {
     return ctx.db.patientAccount.update({
       where: { id: existing.id },
@@ -15,7 +17,7 @@ export async function findOrCreateAccount(ctx: Ctx, waId: string, profileName?: 
     });
   }
   return ctx.db.patientAccount.create({
-    data: { waPhone: encrypt(waId), phoneHash: hash, waProfileName: profileName ? encrypt(profileName) : null, lastInboundAt: now, lastActivityAt: now },
+    data: { channel, waPhone: encrypt(waId), phoneHash: hash, waProfileName: profileName ? encrypt(profileName) : null, lastInboundAt: now, lastActivityAt: now },
   });
 }
 

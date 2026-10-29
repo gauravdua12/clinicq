@@ -17,7 +17,7 @@ let w = 0;
 beforeEach(async () => { h = await harness({ start: "2026-10-09T12:00:00+05:30" }); w = 0; });
 afterEach(async () => h?.close());
 
-const acc = (P: string) => h.db.patientAccount.findUnique({ where: { phoneHash: phoneHash(P) } });
+const acc = (P: string) => h.db.patientAccount.findFirst({ where: { phoneHash: phoneHash(P) } });
 async function state(P: string): Promise<string> {
   const a = await acc(P);
   return (a && (await h.db.conversationState.findUnique({ where: { accountId: a.id } }))?.state) ?? "NONE";

@@ -5,6 +5,7 @@ import { encrypt, normalizeIndianPhone, phoneHash, type Clinic } from "@clinicq/
 import { time as T } from "@clinicq/core";
 import type { Ctx } from "../context";
 import { clinicInfo, invalidateClinicCache } from "./clinic";
+import { DEMO_CHANNEL } from "../scope";
 import { audit } from "./notify";
 
 // Demo Studio: spin up a convincing demo clinic for a prospect from a name, website or brochure text.
@@ -141,7 +142,7 @@ export async function extractProfile(ctx: Ctx, input: DemoInput): Promise<{ prof
 
 const DEMO_PATIENTS = ["Aarav Sharma", "Priya Nair", "Rohit Verma", "Sunita Devi", "Imran Khan", "Kavya Reddy", "Harpreet Kaur", "Vikram Joshi", "Neha Gupta", "Arjun Menon", "Fatima Shaikh", "Deepak Yadav"];
 
-async function uniqueCode(ctx: Ctx, name: string): Promise<string> {
+export async function uniqueCode(ctx: Ctx, name: string): Promise<string> {
   const base = name.replace(/^(dr\.?\s*)/i, "").split(/\s+/).map((w) => w[0] ?? "").join("").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3) || "DMO";
   for (let i = 0; i < 50; i++) {
     const code = i ? `${base}${i}` : base;
@@ -191,7 +192,14 @@ export async function ensurePresenters(ctx: Ctx): Promise<void> {
 }
 
 /** Make a clinic the active one; demo presenters become its doctor-admin so they can run it from WhatsApp. */
+/** Demo Studio works only on clinics served by the shared demo number, never on a customer clinic. */
+async function demoNumberClinic(ctx: Ctx, clinicId: string): Promise<void> {
+  const c = await ctx.db.clinic.findUnique({ where: { id: clinicId }, select: { ownNumber: true } });
+  if (!c || c.ownNumber) throw new Error("not_demo");
+}
+
 export async function activateDemo(ctx: Ctx, clinicId: string, actorId: string | null): Promise<void> {
+  await demoNumberClinic(ctx, clinicId);
   await ctx.db.systemConfig.upsert({ where: { key: "activeClinicId" }, create: { key: "activeClinicId", value: clinicId as never, updatedBy: actorId }, update: { value: clinicId as never, updatedBy: actorId } });
   for (const wa of presenterPhones()) {
     await ctx.db.staffUser.upsert({
@@ -244,6 +252,7 @@ export async function seedDemoActivity(ctx: Ctx, clinicId: string): Promise<void
 }
 
 export async function resetDemo(ctx: Ctx, clinicId: string, actorId: string | null): Promise<void> {
+  await demoNumberClinic(ctx, clinicId);
   const doctor = await ctx.db.doctor.findFirstOrThrow({ where: { clinicId } });
   await ctx.db.queueEntry.deleteMany({ where: { doctorId: doctor.id } });
   await ctx.db.appointment.deleteMany({ where: { doctorId: doctor.id } });
@@ -251,8 +260,10 @@ export async function resetDemo(ctx: Ctx, clinicId: string, actorId: string | nu
   await ctx.db.tokenCounter.deleteMany({ where: { doctorId: doctor.id } });
   await ctx.db.closure.deleteMany({ where: { doctorId: doctor.id } });
   await ctx.db.doctor.update({ where: { id: doctor.id }, data: { delayMinutes: 0, pauseUntil: null } });
-  // Prospects who chatted with the demo number: clear their conversation so the next demo starts fresh.
-  await ctx.db.conversationState.deleteMany({});
+  // Prospects who chatted with the demo number: clear their conversation so the next demo starts fresh
+  // (only the demo number's; customer clinics on their own numbers are never touched).
+  const demoAccounts = (await ctx.db.patientAccount.findMany({ where: { channel: DEMO_CHANNEL }, select: { id: true } })).map((a) => a.id);
+  await ctx.db.conversationState.deleteMany({ where: { accountId: { in: demoAccounts } } });
   await ctx.db.patientProfile.deleteMany({ where: { accountId: null, appointments: { none: {} }, queueEntries: { none: {} } } });
   await seedDemoActivity(ctx, clinicId);
   await audit(ctx, "OPERATOR", actorId, "demo.reset", "Clinic", clinicId);
@@ -260,7 +271,7 @@ export async function resetDemo(ctx: Ctx, clinicId: string, actorId: string | nu
 
 export async function deleteDemo(ctx: Ctx, clinicId: string, actorId: string | null): Promise<void> {
   const clinic = await ctx.db.clinic.findUniqueOrThrow({ where: { id: clinicId } });
-  if (!clinic.isDemo) throw new Error("not_demo");
+  if (!clinic.isDemo || clinic.ownNumber) throw new Error("not_demo");
   const doctor = await ctx.db.doctor.findFirst({ where: { clinicId } });
   if (doctor) {
     await ctx.db.queueEntry.deleteMany({ where: { doctorId: doctor.id } });
@@ -272,7 +283,7 @@ export async function deleteDemo(ctx: Ctx, clinicId: string, actorId: string | n
     await ctx.db.session.deleteMany({ where: { doctorId: doctor.id } });
     await ctx.db.doctor.delete({ where: { id: doctor.id } });
   }
-  const home = await ctx.db.clinic.findFirst({ where: { id: { not: clinicId } }, orderBy: [{ isDemo: "asc" }, { createdAt: "asc" }] });
+  const home = await ctx.db.clinic.findFirst({ where: { id: { not: clinicId }, ownNumber: false }, orderBy: [{ isDemo: "asc" }, { createdAt: "asc" }] });
   if (home) {
     await ctx.db.staffUser.updateMany({ where: { clinicId }, data: { clinicId: home.id } });
     const active = await ctx.db.systemConfig.findUnique({ where: { key: "activeClinicId" } });

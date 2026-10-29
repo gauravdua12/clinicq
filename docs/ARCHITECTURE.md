@@ -136,6 +136,14 @@ sequenceDiagram
 ### 3.4 Consultation completed (one tap)
 `POST /api/queue/complete` → transaction: IN_CONSULT→COMPLETED; NEXT→IN_CONSULT; pickNext(waiting)→NEXT. Then audit, SSE `queue.updated`, and notify the new NEXT and IN_CONSULT patients plus whoever crossed the turn-near threshold. ETA recompute is broadcast to the TV.
 
+### 3.5 Clinics on their own numbers (multi-clinic)
+One server runs the shared **demo number** (Demo Studio switches which demo clinic it serves) and any number of **customer clinics** on their own WhatsApp numbers (`Clinic.ownNumber`, connected with Embedded Signup, `WaConnection`).
+- **Scope** (`apps/server/src/scope.ts`, AsyncLocalStorage): every unit of work runs in a clinic scope, set once where it enters: the webhook (by `metadata.phone_number_id`), dashboard requests (the signed-in staff member's clinic), the TV display (its key), the booking and pay pages (their tokens), and jobs (the scope they were scheduled in, kept as `clinicScope` in the payload). `clinicInfo(ctx)`, `ctx.wa` (sends from the clinic's own number), live events (`EventBus` delivers only within the clinic) and patient accounts follow the scope without being passed around.
+- **Patients** belong to a number: `PatientAccount.channel` is `"demo"` or the customer clinic's id, unique with `phoneHash`. A person who messages two clinics has two separate accounts, consents and histories.
+- **Staff** WhatsApp commands work only on their own clinic's number. Dashboard routes that take an id check that it belongs to the signed-in clinic (else 404).
+- **Disconnected** numbers are ignored (`scopeForNumber` → "ignore"); Demo Studio can't activate, reset or delete a customer clinic.
+- Embedded Signup (`services/embeddedSignup.ts`): the browser gets a one-time code from Meta's pop-up; the server exchanges it for the clinic's business token (stored encrypted, never sent back), checks the number is in the account, subscribes the account's webhooks, registers the number (not for coexistence), saves the connection, then a job submits the templates and checks their approval. Disconnect unsubscribes and wipes the token at once; the ids go after 30 days.
+
 ## 4. Conversation state
 - `ConversationState` row per account: `{state, context(jsonb), expiresAt}`. Context holds only structured fields: `pendingIntent, profileId, date, timePref, offeredSlots[], heldAppointmentId, lang`.
 - TTL is 30 min since the last message. After that, a new message starts a new conversation (consent and number are remembered).

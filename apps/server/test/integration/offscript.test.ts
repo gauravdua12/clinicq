@@ -16,7 +16,7 @@ const nextPhone = () => `9198${String(++n).padStart(8, "0")}`;
 const body = (m?: OutMsg) => (m && "body" in m ? m.body : m?.kind === "template" ? m.name : "");
 
 async function state(from: string): Promise<string> {
-  const acc = await h.db.patientAccount.findUnique({ where: { phoneHash: phoneHash(from) } });
+  const acc = await h.db.patientAccount.findFirst({ where: { phoneHash: phoneHash(from) } });
   const row = acc ? await h.db.conversationState.findUnique({ where: { accountId: acc.id } }) : null;
   return row?.state ?? "NONE";
 }
@@ -117,7 +117,7 @@ describe("off-script messages in every state", () => {
         expect(replies.length, where).toBeGreaterThan(0);
         expect(body(replies[0]), where).not.toBe(prev); // never the previous message again, word for word
         expect(await h.kinds(P), where).not.toContain("SYSTEM_ERROR");
-        const acc = await h.db.patientAccount.findUniqueOrThrow({ where: { phoneHash: phoneHash(P) } });
+        const acc = await h.db.patientAccount.findFirstOrThrow({ where: { phoneHash: phoneHash(P) } });
         if (cat === "rude") {
           expect(all, where).toMatch(/sorry|माफ़/i);
           expect(acc.optedOutAt, where).toBeNull(); // frustration is not an unsubscribe
@@ -162,7 +162,7 @@ describe("the reported chat: new patient types instead of tapping", () => {
     await h.say(P, "Stop it now");
     expect(body(h.wa.last(P))).toMatch(/sorry/i);
     expect(body(h.wa.last(P))).not.toBe(body(rude)); // a second apology is worded differently
-    expect((await h.db.patientAccount.findUniqueOrThrow({ where: { phoneHash: phoneHash(P) } })).optedOutAt).toBeNull();
+    expect((await h.db.patientAccount.findFirstOrThrow({ where: { phoneHash: phoneHash(P) } })).optedOutAt).toBeNull();
     await h.say(P, "ok");
     expect((await h.kinds(P)).at(-1)).toBe("MAIN_MENU"); // number confirmed, menu shown
   });

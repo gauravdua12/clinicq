@@ -3,16 +3,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, BASE } from "@/lib/api";
 import { Shell } from "@/lib/Shell";
+import { WhatsAppTab } from "@/lib/WhatsAppConnect";
 
-type Tab = "clinic" | "sessions" | "closures" | "staff" | "model" | "qr";
+type Tab = "clinic" | "sessions" | "closures" | "staff" | "whatsapp" | "model" | "qr";
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function Settings() {
   const [tab, setTab] = useState<Tab>("clinic");
   // "Language model" is for Incolo's internal admins only, never for clinic staff.
   const [incolo, setIncolo] = useState(false);
-  useEffect(() => { api<{ incoloAdmin?: boolean }>("/api/me").then((m) => setIncolo(!!m?.incoloAdmin)).catch(() => undefined); }, []);
-  const tabs: [Tab, string][] = [["clinic", "Clinic"], ["sessions", "Sessions"], ["closures", "Holidays & leave"], ["staff", "Staff"], ...(incolo ? [["model", "Language model"] as [Tab, string]] : []), ["qr", "Walk-in QR & TV"]];
+  const [ownNumber, setOwnNumber] = useState(false);
+  useEffect(() => {
+    api<{ incoloAdmin?: boolean }>("/api/me").then((m) => setIncolo(!!m?.incoloAdmin)).catch(() => undefined);
+    api<{ ownNumber?: boolean }>("/api/clinic").then((c) => setOwnNumber(!!c?.ownNumber)).catch(() => undefined);
+  }, []);
+  const tabs: [Tab, string][] = [["clinic", "Clinic"], ["sessions", "Sessions"], ["closures", "Holidays & leave"], ["staff", "Staff"], ...(ownNumber ? [["whatsapp", "WhatsApp"] as [Tab, string]] : []), ...(incolo ? [["model", "Language model"] as [Tab, string]] : []), ["qr", "Walk-in QR & TV"]];
   return (
     <Shell active="/settings">
       <h1>Settings</h1>
@@ -21,6 +26,7 @@ export default function Settings() {
       {tab === "sessions" && <SessionsTab />}
       {tab === "closures" && <ClosuresTab />}
       {tab === "staff" && <StaffTab />}
+      {tab === "whatsapp" && ownNumber && <WhatsAppTab />}
       {tab === "model" && incolo && <ModelTab />}
       {tab === "qr" && <QrTab />}
     </Shell>

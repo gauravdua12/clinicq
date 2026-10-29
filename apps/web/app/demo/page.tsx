@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, BASE } from "@/lib/api";
 import { Shell } from "@/lib/Shell";
+import { CustomerClinics } from "@/lib/CustomerClinics";
 
 interface Session { days: number[]; label: string; start: string; end: string }
 interface Profile { clinicName: string; doctorName: string; qualification: string | null; specialty: string | null; addressShort: string; addressFull: string; phone: string | null; mapsUrl: string | null; fees: string | null; sessions: Session[] }
@@ -35,7 +36,7 @@ export default function DemoStudio() {
 
   const input = () => ({ name: name.trim(), website: website.trim(), details: details.trim() || undefined, doctorName: doctorName.trim() || undefined, specialty: specialty.trim() || undefined });
 
-  if (off) return <Shell active="/demo"><div className="empty">Demo Studio is turned off on this server (DEMO_STUDIO=false).</div></Shell>;
+  if (off) return <Shell active="/demo"><div className="empty">Demo Studio is turned off on this server (DEMO_STUDIO=false).</div><CustomerClinics /></Shell>;
 
   return (
     <Shell active="/demo" title="Show Q-Incolo to a prospect in two minutes">
@@ -110,7 +111,7 @@ export default function DemoStudio() {
       </div>
 
       <section className="card" style={{ marginTop: 16 }}>
-        <h2>Clinics on this server</h2>
+        <h2>Clinics on the demo number</h2>
         {demos.length === 0 && <div className="empty">No demos yet. Create one above.</div>}
         <div className="table-wrap"><table>
           <thead><tr><th>Clinic</th><th>Doctor</th><th>Area</th><th>Type</th><th /></tr></thead>
@@ -128,6 +129,7 @@ export default function DemoStudio() {
           ))}</tbody>
         </table></div>
       </section>
+      <CustomerClinics />
     </Shell>
   );
 }

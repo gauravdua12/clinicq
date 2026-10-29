@@ -23,6 +23,9 @@ import { flowRoutes } from "./routes/flow";
 import { webhookRoutes } from "./routes/webhook";
 import { AiRuntime } from "./services/ai";
 import { EventBus } from "./sse";
+import { inScope } from "./scope";
+import { scopeForRequest } from "./services/tenancy";
+import { RoutedWhatsApp } from "./services/whatsapp";
 
 export interface BuildOpts { env: Env; db?: Db; wa?: WhatsAppClient; clock?: Clock; log?: Logger; serveStatic?: boolean }
 
@@ -32,13 +35,15 @@ export async function buildApp(opts: BuildOpts): Promise<{ app: FastifyInstance;
   const db = opts.db ?? createDb(env.DATABASE_URL);
   const log = opts.log ?? createLogger({ level: env.NODE_ENV === "test" ? "silent" : undefined });
   const clock = opts.clock ?? new OffsetClock();
-  const wa = opts.wa ?? (env.WA_MODE === "cloud"
+  const sharedWa = opts.wa ?? (env.WA_MODE === "cloud"
     ? new CloudApiClient({ token: env.WA_ACCESS_TOKEN ?? "", phoneNumberId: env.WA_PHONE_NUMBER_ID ?? "", graphVersion: env.WA_GRAPH_VERSION })
     : new MockWhatsApp());
+  // Each customer clinic sends from its own connected number; the demo scope uses the shared number (services/whatsapp.ts).
+  const wa = new RoutedWhatsApp(sharedWa, db, env.WA_GRAPH_VERSION);
   const ai = new AiRuntime(db, env, new MockSpeechToText());
   const flowKey = env.FLOW_PRIVATE_KEY_PATH && existsSync(env.FLOW_PRIVATE_KEY_PATH) ? loadPrivateKey(readFileSync(env.FLOW_PRIVATE_KEY_PATH, "utf8"), env.FLOW_PRIVATE_KEY_PASSPHRASE) : null;
   const ctx: Ctx = {
-    env, db, wa, log, clock, bus: new EventBus(), tz: env.CLINIC_TZ,
+    env, db, wa, sharedWa, log, clock, bus: new EventBus(), tz: env.CLINIC_TZ,
     jobs: new Scheduler(db, clock, log),
     cascade: () => ai.cascade(),
     stt: () => ai.stt(),
@@ -53,6 +58,11 @@ export async function buildApp(opts: BuildOpts): Promise<{ app: FastifyInstance;
     try { done(null, (body as Buffer).length ? JSON.parse((body as Buffer).toString("utf8")) : {}); } catch { done(Object.assign(new Error("invalid_json"), { statusCode: 400 }), undefined); }
   });
   await app.register(cookie, { secret: env.SESSION_SECRET });
+  // Every request runs in its clinic's scope (src/scope.ts). preValidation: after the body is read, so the scope
+  // isn't lost to the body stream's own async context.
+  app.addHook("preValidation", (req, _reply, done) => {
+    scopeForRequest(ctx, req).then((scope) => inScope(scope, done), (e: Error) => done(e));
+  });
   if (env.WEB_DEV_ORIGIN && env.NODE_ENV !== "production") await app.register(cors, { origin: env.WEB_DEV_ORIGIN, credentials: true });
   app.addHook("onSend", async (_req, reply, payload) => {
     reply.header("x-content-type-options", "nosniff");

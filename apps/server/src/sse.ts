@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { currentScope } from "./scope";
 
 // In-process event bus feeding Server-Sent Events to dashboards and the TV display.
 export type BusEvent =
@@ -11,10 +12,13 @@ export type BusEvent =
   | { type: "system.alert"; kind: string; message: string }
   | { type: "payment.claimed"; id: string; name: string; amount: string };
 
+/** Events stay within their clinic (src/scope.ts): a dashboard or TV only hears its own clinic's events. */
 export class EventBus extends EventEmitter {
-  publish(e: BusEvent): void { this.emit("event", e); }
+  publish(e: BusEvent): void { this.emit("event", e, currentScope().clinicId); }
   subscribe(fn: (e: BusEvent) => void): () => void {
-    this.on("event", fn);
-    return () => this.off("event", fn);
+    const mine = currentScope().clinicId;
+    const h = (e: BusEvent, clinicId: string | null) => { if (clinicId === mine) fn(e); };
+    this.on("event", h);
+    return () => this.off("event", h);
   }
 }

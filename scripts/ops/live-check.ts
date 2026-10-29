@@ -27,7 +27,7 @@ async function post(message: Record<string, unknown>, opts: { wamid?: string; ag
 }
 const say = (body: string, o?: { wamid?: string; ageMin?: number }) => post({ type: "text", text: { body } }, o);
 const tap = (id: string) => post({ type: "interactive", interactive: { type: "button_reply", button_reply: { id, title: id } } });
-const account = () => db.patientAccount.findUnique({ where: { phoneHash: phoneHash(FROM) } });
+const account = () => db.patientAccount.findFirst({ where: { phoneHash: phoneHash(FROM) } });
 const state = async () => { const a = await account(); return a ? (await db.conversationState.findUnique({ where: { accountId: a.id } }))?.state ?? "IDLE" : "NONE"; };
 const booked_ = async () => booked();
 const booked = async () => { const a = await account(); return a ? db.appointment.findMany({ where: { status: "BOOKED", profile: { accountId: a.id } } }) : []; };
@@ -144,7 +144,7 @@ try {
     const raw = JSON.stringify(buildWebhook({ from: FROM2, name: "Live Check", wamid: `wamid.live.${randomUUID()}`, message }));
     await fetch(`${BASE}/webhook`, { method: "POST", headers: { "content-type": "application/json", "x-hub-signature-256": signBody(raw, SECRET) }, body: raw });
   };
-  const acc2 = () => db.patientAccount.findUnique({ where: { phoneHash: phoneHash(FROM2) } });
+  const acc2 = () => db.patientAccount.findFirst({ where: { phoneHash: phoneHash(FROM2) } });
   const outKinds = async () => { const a = await acc2(); return a ? (await db.messageLog.findMany({ where: { accountId: a.id, direction: "OUT" }, orderBy: { createdAt: "asc" } })).map((m) => m.kind.replace(/^failed:/, "")) : []; };
   await post2({ type: "text", text: { body: "Hi" } });
   await post2({ type: "interactive", interactive: { type: "button_reply", button_reply: { id: "consent:yes", title: "I agree" } } });

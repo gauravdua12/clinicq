@@ -11,7 +11,7 @@
 ## 2. Allowed fields (exhaustive; adding a field needs a change to this doc first)
 | Entity | Field | Notes |
 |---|---|---|
-| PatientAccount | waPhone (encrypted), phoneHash, waProfileName (encrypted), language, numberConfirmedAt, optedOutAt | The WhatsApp number is the identity |
+| PatientAccount | channel, waPhone (encrypted), phoneHash, waProfileName (encrypted), language, numberConfirmedAt, optedOutAt | The WhatsApp number is the identity, per clinic number (`channel`): each clinic's patients are separate |
 | PatientProfile | name (encrypted), relation enum, yearOfBirth?, gender?, contactPhone? (encrypted) | yob and gender are optional and only used to tell family members apart |
 | ConsentRecord | noticeVersion, language, givenAt, withdrawnAt, channel | |
 | Appointment | profileId, slotStart, visitType enum, status, token, source, timestamps, fee status | **No reason or notes field** |
@@ -20,6 +20,7 @@
 | FollowUp | profileId, doctorId, dueDate, remindedAt, bookedAppointmentId, cancelledAt, createdById | **No reason** |
 | PaymentDue | profileId, doctorId, visitDate, amountPaise, status (PENDING/PAID/CANCELLED), payToken, reminder counts, claimedPaidAt, paidAt | **No reason, description or bill items.** The patient pays the clinic directly (UPI or at the clinic); no UPI or card details are stored |
 | Payment | provider order ID, amount, status, refund status | No UPI or card details |
+| WaConnection (customer clinics) | WhatsApp Business Account id, phone number id, display number, verified name, business token (encrypted), registration PIN (encrypted), status, who connected it (name), status check | Clinic data from Meta; the token is wiped on disconnect |
 | MessageLog | direction, templateName or copyId, wamid, status, timestamps | **No message body** |
 | AuditLog | actor, action, entity, entityId, timestamp, small diff of logistics fields | |
 
@@ -49,6 +50,7 @@
 | PatientProfile / PatientAccount | 12 months after last activity | delete (cascade; anonymise linked visits first) |
 | Payment | 8 years (tax and accounting law) | keep amount, date, order ID; unlink from profile after 180 days |
 | FollowUp | 180 days after the due date | delete |
+| WaConnection | token: at once on disconnect; ids: 30 days after disconnect | wipe / delete |
 | PaymentDue | 180 days after the visit, once paid or cancelled (pending ones stay until settled) | delete. The clinic's own accounts are its record of payment |
 | AuditLog | 1 year | delete |
 | ConsentRecord | life of account + 1 year | delete |

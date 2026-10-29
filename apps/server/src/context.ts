@@ -12,7 +12,10 @@ import type { KeyObject } from "node:crypto";
 export interface Ctx {
   env: Env;
   db: Db;
-  wa: WhatsAppClient;
+  /** WhatsApp for the current clinic scope (services/whatsapp.ts). */
+  wa: WhatsAppClient & { invalidate(clinicId?: string): void };
+  /** The shared demo number's client (the mock in dev and tests). */
+  sharedWa: WhatsAppClient;
   log: Logger;
   clock: Clock;
   bus: EventBus;

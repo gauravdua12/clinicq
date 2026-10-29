@@ -7,7 +7,7 @@ import { OffsetClock } from "../clock";
 // Dev-only WhatsApp simulator backend (docs/WHATSAPP_INTEGRATION.md §7). Never registered in production.
 
 export async function devRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> {
-  const mock = ctx.wa instanceof MockWhatsApp ? ctx.wa : null;
+  const mock = ctx.sharedWa instanceof MockWhatsApp ? ctx.sharedWa : null;
 
   /** Build a Meta-format webhook, sign it, and post it through the real /webhook route. */
   app.post("/dev/simulate", async (req, reply) => {

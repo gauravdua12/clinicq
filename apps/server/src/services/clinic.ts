@@ -1,9 +1,10 @@
 import type { Clinic, Doctor, Session } from "@clinicq/db";
 import { slots as S, time as T } from "@clinicq/core";
 import type { Ctx } from "../context";
+import { currentScope } from "../scope";
 import { parseSettings, type ClinicSettings } from "../settings";
 
-// Single-clinic, single-doctor MVP (doctorId is everywhere, so a second doctor is a later UI change).
+// One doctor per clinic (doctorId is everywhere, so a second doctor is a later UI change). Several clinics: src/scope.ts.
 
 export interface ClinicInfo {
   clinic: Clinic;
@@ -12,25 +13,37 @@ export interface ClinicInfo {
   settings: ClinicSettings;
 }
 
-let cache: { at: number; info: ClinicInfo } | null = null;
+const cache = new Map<string, { at: number; info: ClinicInfo }>();
 
-export function invalidateClinicCache(): void { cache = null; }
+export function invalidateClinicCache(): void { cache.clear(); }
 
+/**
+ * The clinic of the current scope (src/scope.ts): a customer clinic on its own number, or, on the shared demo number,
+ * the active clinic (a demo can be switched in via Demo Studio; else the first clinic).
+ */
 export async function clinicInfo(ctx: Ctx): Promise<ClinicInfo> {
-  if (cache && Date.now() - cache.at < 5_000) {
+  const scoped = currentScope().clinicId;
+  const key = scoped ?? "";
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < 5_000) {
     // cheap re-validation: the cached clinic/doctor must still exist (DB may have been changed by another process)
-    const alive = await ctx.db.doctor.findUnique({ where: { id: cache.info.doctor.id }, select: { id: true } });
-    if (alive) return cache.info;
-    cache = null;
+    const alive = await ctx.db.doctor.findUnique({ where: { id: hit.info.doctor.id }, select: { id: true } });
+    if (alive) return hit.info;
+    cache.delete(key);
   }
-  // Active clinic (a demo can be switched in via Demo Studio); else the first clinic.
-  const active = await ctx.db.systemConfig.findUnique({ where: { key: "activeClinicId" } });
-  const activeId = typeof active?.value === "string" ? active.value : null;
-  const clinic = (activeId ? await ctx.db.clinic.findUnique({ where: { id: activeId } }) : null) ?? (await ctx.db.clinic.findFirstOrThrow({ orderBy: { createdAt: "asc" } }));
+  let clinic: Clinic | null = null;
+  if (scoped) clinic = await ctx.db.clinic.findUnique({ where: { id: scoped } });
+  else {
+    const active = await ctx.db.systemConfig.findUnique({ where: { key: "activeClinicId" } });
+    const activeId = typeof active?.value === "string" ? active.value : null;
+    clinic = (activeId ? await ctx.db.clinic.findFirst({ where: { id: activeId, ownNumber: false } }) : null)
+      ?? (await ctx.db.clinic.findFirst({ where: { ownNumber: false }, orderBy: { createdAt: "asc" } }));
+  }
+  if (!clinic) throw new Error(scoped ? "clinic_not_found" : "no_clinic");
   const doctor = await ctx.db.doctor.findFirstOrThrow({ where: { clinicId: clinic.id } });
   const sessions = await ctx.db.session.findMany({ where: { doctorId: doctor.id, active: true } });
   const info = { clinic, doctor, sessions, settings: parseSettings(clinic.settings) };
-  cache = { at: Date.now(), info };
+  cache.set(key, { at: Date.now(), info });
   return info;
 }
 

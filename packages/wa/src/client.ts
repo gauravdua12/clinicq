@@ -55,7 +55,7 @@ export class CloudApiClient implements WhatsAppClient {
   }
 }
 
-export interface MockOutbound { id: string; to: string; msg: OutMsg; at: number }
+export interface MockOutbound { id: string; to: string; msg: OutMsg; at: number; via?: string }
 
 /** In-memory WhatsApp used in dev (simulator) and tests. */
 export class MockWhatsApp extends EventEmitter implements WhatsAppClient {
@@ -64,17 +64,17 @@ export class MockWhatsApp extends EventEmitter implements WhatsAppClient {
   readonly mediaDownloads: string[] = [];
   failNext = 0;
 
-  async send(to: string, msg: OutMsg): Promise<SendResult> {
+  async send(to: string, msg: OutMsg, via?: string): Promise<SendResult> {
     validate(msg);
     if (this.failNext > 0) { this.failNext--; throw new WhatsAppApiError(500); }
     const id = `wamid.mock.${randomUUID()}`;
-    const rec = { id, to, msg, at: Date.now() };
+    const rec = { id, to, msg, at: Date.now(), ...(via ? { via } : {}) };
     this.sent.push(rec);
     this.emit("outbound", rec);
     return { wamid: id };
   }
 
-  async downloadMedia(mediaId: string): Promise<{ data: Buffer; mime: string }> {
+  async downloadMedia(mediaId: string, _maxBytes?: number): Promise<{ data: Buffer; mime: string }> {
     this.mediaDownloads.push(mediaId);
     const m = this.media.get(mediaId);
     if (!m) throw new WhatsAppApiError(404);
@@ -82,6 +82,11 @@ export class MockWhatsApp extends EventEmitter implements WhatsAppClient {
   }
 
   async markRead(): Promise<void> {}
+
+  /** The same mock, sending from another number (a clinic's own phone number id): records `via`. */
+  as(phoneNumberId: string): WhatsAppClient {
+    return { send: (to, msg) => this.send(to, msg, phoneNumberId), downloadMedia: (id, max) => this.downloadMedia(id, max), markRead: async () => undefined };
+  }
 
   to(waId: string): OutMsg[] { return this.sent.filter((s) => s.to === waId).map((s) => s.msg); }
   last(waId: string): OutMsg | undefined { return this.to(waId).at(-1); }

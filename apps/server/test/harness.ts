@@ -66,7 +66,7 @@ export async function harness(opts: { start: string; primary?: ModelHandle | nul
     image: (from) => post(from, { type: "image", image: { id: `media.${randomUUID()}`, mime_type: "image/jpeg" } }),
     flow: (from, resp) => post(from, { type: "interactive", interactive: { type: "nfm_reply", nfm_reply: { response_json: JSON.stringify(resp) } } }),
     kinds: async (from) => {
-      const acc = await db.patientAccount.findUnique({ where: { phoneHash: phoneHash(from) } });
+      const acc = await db.patientAccount.findFirst({ where: { phoneHash: phoneHash(from) } });
       const staff = acc ? null : await db.staffUser.findUnique({ where: { phoneHash: phoneHash(from) } });
       if (staff) return wa.to(from).map((m) => (m.kind === "template" ? `template:${m.name}` : m.kind));
       const rows = await db.messageLog.findMany({ where: { accountId: acc?.id ?? "none", direction: "OUT" }, orderBy: { createdAt: "asc" } });

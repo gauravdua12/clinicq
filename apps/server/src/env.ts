@@ -16,6 +16,9 @@ export const EnvSchema = z.object({
   WA_MODE: z.enum(["mock", "cloud"]).default("mock"),
   META_APP_SECRET: z.string().min(1),
   META_VERIFY_TOKEN: z.string().min(1),
+  /** WhatsApp Embedded Signup (customer clinics connect their own numbers): the Meta app id and the Facebook Login for Business configuration id. Both public. */
+  META_APP_ID: z.string().default(""),
+  META_ES_CONFIG_ID: z.string().default(""),
   WA_ACCESS_TOKEN: z.string().optional(),
   WA_PHONE_NUMBER_ID: z.string().optional(),
   WA_GRAPH_VERSION: z.string().default("v23.0"),

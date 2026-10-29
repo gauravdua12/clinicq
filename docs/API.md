@@ -58,6 +58,15 @@ Base: `PUBLIC_BASE_URL`. JSON everywhere. Auth means an httpOnly `sid` cookie (S
 - `POST /api/payments {appointmentId | queueEntryId, amount (₹)}` → sends the first message now → `{id, whatsappSent}`. Errors: `no_upi` (set the UPI ID first), `no_whatsapp`.
 - `POST /api/payments/:id/paid` (sends the receipt) · `/remind` (once per 12 h, else `too_soon`) · `/cancel`.
 
+## The clinic's own WhatsApp number (role: DOCTOR, customer clinics)
+- `GET /api/whatsapp` → `{ownNumber, signup: {appId, configId, graphVersion} | null, connection: {displayPhone, verifiedName, connectedBy, connectedAt, checkedAt, health} | null}`.
+- `POST /api/whatsapp/connect {code, wabaId, phoneNumberId, coexistence?}` (from Meta's Embedded Signup pop-up) → the same view + `problems`. Errors: `code_exchange_failed`, `number_not_found`, `number_in_use`, `not_configured`, `not_customer_clinic`.
+- `POST /api/whatsapp/check` · `/templates` (submit missing ones) · `/disconnect`.
+
+## Customer clinics (Incolo admins)
+- `GET /api/admin/clinics` → `[{id, name, doctor, doctorPhone (masked), createdAt, whatsapp: {status, displayPhone, verifiedName} | null}]`.
+- `POST /api/admin/clinics {clinicName, doctorName, doctorPhone, addressShort, clinicPhone}` → `{id, code}`. Errors: `bad_phone`, `phone_in_use`.
+
 ## Settings (role: DOCTOR)
 | Method | Path | Purpose |
 |---|---|---|

@@ -3,6 +3,7 @@ import { decrypt, displayPhone, encrypt, normalizeIndianPhone, phoneHash, type P
 import { copy as C, safety, slots as S, time as T } from "@clinicq/core";
 import { CALL_SELF_RE, END_RE, extract, WRONG_RE, type Extraction, type ExtractContext } from "@clinicq/core/extract/index";
 import { sttUnavailable } from "@clinicq/ai/stt";
+import { currentScope } from "../scope";
 import type { Button, InboundMessage, ListSection, OutMsg } from "@clinicq/wa";
 import type { Ctx } from "../context";
 import { activeCountForProfile, cancelAppointment, confirmHold, FamilySlotError, holdSlot, releaseHold, reschedule, SlotTakenError, upcomingForAccount, type UpcomingView } from "./booking";
@@ -186,8 +187,10 @@ async function saveConv(ctx: Ctx, accountId: string, conv: Conv): Promise<void> 
 
 export async function handleInbound(ctx: Ctx, msg: InboundMessage): Promise<void> {
   const info = await clinicInfo(ctx);
-  const staff = await ctx.db.staffUser.findUnique({ where: { phoneHash: phoneHash(msg.from) } });
-  if (staff?.active && (await handleStaffMessage(ctx, staff, msg))) return;
+  const staff = await ctx.db.staffUser.findUnique({ where: { phoneHash: phoneHash(msg.from) }, include: { clinic: { select: { ownNumber: true } } } });
+  // Staff commands only on their own clinic's number (src/scope.ts); elsewhere a staff member is just a patient.
+  const staffHere = !!staff && (staff.clinic.ownNumber ? staff.clinicId === currentScope().clinicId : !currentScope().clinicId);
+  if (staff?.active && staffHere && (await handleStaffMessage(ctx, staff, msg))) return;
 
   const acc = await findOrCreateAccount(ctx, msg.from, msg.profileName);
   await ctx.db.messageLog.create({ data: { accountId: acc.id, direction: "IN", kind: `in:${msg.kind}${msg.isVoice ? ":voice" : ""}`, wamid: msg.wamid } }).catch(() => undefined);

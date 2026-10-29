@@ -4,6 +4,7 @@ import { copy } from "@clinicq/core";
 import { decrypt, encrypt, normalizeIndianPhone, phoneHash, type StaffUser } from "@clinicq/db";
 import type { Ctx } from "../context";
 import { sendTo } from "../services/notify";
+import { inScope } from "../scope";
 
 // Staff login: WhatsApp OTP (auth template) → httpOnly session cookie (PRD DB-01).
 
@@ -85,9 +86,12 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> 
     await ctx.db.otpChallenge.upsert({ where: { phoneHash: staff.phoneHash }, create: { phoneHash: staff.phoneHash, codeHash: sha(code), expiresAt: new Date(ctx.clock.now().getTime() + 5 * 60_000) }, update: { codeHash: sha(code), attempts: 0, expiresAt: new Date(ctx.clock.now().getTime() + 5 * 60_000) } });
     if (rv && rv.wa === wa) return { ok: true };
     const to = decrypt(staff.waPhone);
-    const sent = await sendTo(ctx, to, { kind: "template", name: "staff_login_otp", lang: "en", bodyParams: [code], otpCode: code }, { kind: "staff_login_otp" });
+    // From the clinic's own number once it's connected; before that (or for demo clinics) from the shared number.
+    const conn = await ctx.db.waConnection.findUnique({ where: { clinicId: staff.clinicId }, select: { status: true } });
+    const sendScope = { clinicId: conn?.status === "CONNECTED" ? staff.clinicId : null };
+    const sent = await inScope(sendScope, () => sendTo(ctx, to, { kind: "template", name: "staff_login_otp", lang: "en", bodyParams: [code], otpCode: code }, { kind: "staff_login_otp" }));
     // Until Meta approves the authentication template, a plain message still works if this person messaged the bot in the last 24 h.
-    if (!sent) await sendTo(ctx, to, { kind: "text", body: copy.render("STAFF_OTP_TEXT", "en", { code }) }, { kind: "staff_login_otp_text" });
+    if (!sent) await inScope(sendScope, () => sendTo(ctx, to, { kind: "text", body: copy.render("STAFF_OTP_TEXT", "en", { code }) }, { kind: "staff_login_otp_text" }));
     return { ok: true };
   });
 

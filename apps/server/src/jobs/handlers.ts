@@ -6,6 +6,8 @@ import { sendToAccount } from "../services/notify";
 import { firstName } from "../services/patients";
 import { arriveAppointment } from "../services/queue";
 import { followUpDue, paymentRemindJob } from "../services/reminders";
+import { checkConnection, submitTemplates } from "../services/embeddedSignup";
+import { currentScope } from "../scope";
 import { overflowTimeout } from "../services/walkin";
 
 // Scheduled jobs (docs/ARCHITECTURE.md §5). Payloads carry IDs only.
@@ -36,6 +38,15 @@ export function registerJobs(ctx: Ctx): void {
 
   j.on("followUpDue", async ({ id }) => followUpDue(ctx, String(id)));
   j.on("paymentRemind", async ({ id }) => paymentRemindJob(ctx, String(id)));
+
+  // A customer clinic just connected its number: submit its templates, then check their approval a few times.
+  j.on("waTemplates", async () => {
+    const r = await submitTemplates(ctx);
+    ctx.log.info({ created: r.created, failed: r.failed.length }, "wa_templates_submitted");
+    const now = ctx.clock.now().getTime();
+    for (const min of [10, 60, 24 * 60]) await j.schedule("waCheck", {}, new Date(now + min * 60_000), `wa-check:${currentScope().clinicId}:${min}`);
+  });
+  j.on("waCheck", async () => { await checkConnection(ctx); });
 
   j.on("overflowTimeout", async ({ requestId }) => overflowTimeout(ctx, String(requestId)));
 
@@ -97,6 +108,8 @@ export async function purge(ctx: Ctx): Promise<Record<string, number>> {
   out.paymentsDue = (await ctx.db.paymentDue.deleteMany({ where: { status: { not: "PENDING" }, visitDate: { lt: visitCut } } })).count;
   out.audit = (await ctx.db.auditLog.deleteMany({ where: { at: { lt: new Date(now - r.auditDays * day) } } })).count;
   out.jobs = (await ctx.db.scheduledJob.deleteMany({ where: { doneAt: { lt: new Date(now - 7 * day) } } })).count;
+  // A clinic that disconnected its WhatsApp: its account and number ids go 30 days later (the token went at once).
+  out.waConnections = (await ctx.db.waConnection.deleteMany({ where: { status: "DISCONNECTED", checkedAt: { lt: new Date(now - 30 * day) } } })).count;
   out.otp = (await ctx.db.otpChallenge.deleteMany({ where: { expiresAt: { lt: new Date(now) } } })).count;
   out.sessions = (await ctx.db.staffSession.deleteMany({ where: { expiresAt: { lt: new Date(now) } } })).count;
   ctx.log.info({ purge: out }, "purge_done");

@@ -25,10 +25,30 @@ model Clinic {
   settings         Json
   displayKey       String      @unique
   isDemo           Boolean     @default(false)
+  /// A customer clinic on its own WhatsApp number (Embedded Signup). Otherwise it runs on the shared demo number.
+  ownNumber        Boolean     @default(false)
   demoSource       Json?       // { website?, specialty?, extractedBy? } — public business info only
   createdAt        DateTime    @default(now())
   doctors          Doctor[]
   staff            StaffUser[]
+  waConnection     WaConnection?
+}
+
+// A customer clinic's own WhatsApp Business number, connected by the clinic through Embedded Signup.
+model WaConnection {
+  clinicId      String    @id
+  clinic        Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  wabaId        String
+  phoneNumberId String    @unique
+  displayPhone  String?
+  verifiedName  String?
+  token         String // enc: the business token for this clinic's WhatsApp account
+  pin           String? // enc: the two-step verification PIN set when the number was registered
+  status        String // CONNECTED | DISCONNECTED
+  connectedBy   String? // name of the person who connected it (Facebook public profile)
+  connectedAt   DateTime  @default(now())
+  checkedAt     DateTime?
+  health        Json? // last status check: number name/quality/limits, template approvals, problems
 }
 
 model Doctor {
@@ -100,8 +120,11 @@ enum StaffRole {
 
 model PatientAccount {
   id                String           @id @default(cuid())
+  /// The WhatsApp number the patient talks to: "demo" (the shared number) or a customer clinic's id. A patient of two
+  /// clinics has two separate accounts, consents and histories.
+  channel           String           @default("demo")
   waPhone           String // enc
-  phoneHash         String           @unique
+  phoneHash         String
   waProfileName     String? // enc
   language          Lang             @default(en)
   numberConfirmedAt DateTime?
@@ -112,6 +135,9 @@ model PatientAccount {
   createdAt         DateTime         @default(now())
   profiles          PatientProfile[]
   consents          ConsentRecord[]
+
+  @@unique([channel, phoneHash])
+  @@index([phoneHash])
 }
 
 enum Lang {

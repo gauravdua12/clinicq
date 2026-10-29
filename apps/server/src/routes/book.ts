@@ -5,6 +5,7 @@ import { decrypt } from "@clinicq/db";
 import type { Ctx } from "../context";
 import { clinicInfo, windowAvailability } from "../services/clinic";
 import { bookFromPage } from "../services/conversation";
+import { clinicWaNumber } from "../services/whatsapp";
 
 // Booking page (form D) opened from a WhatsApp button: /book?t=<token>. The token (FlowToken row, 30 min, one use)
 // names the patient account and profile; nothing else identifies the patient, and the page shows a first name only.
@@ -32,7 +33,7 @@ export async function bookRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> 
       clinic: { name: info.clinic.name, address: info.clinic.addressShort ?? "" },
       name: profile ? decrypt(profile.name).split(" ")[0] : "",
       lang: acc?.language ?? "en",
-      waNumber: ctx.env.WA_DISPLAY_NUMBER,
+      waNumber: await clinicWaNumber(ctx),
       dates,
       selected: dates.find((d) => d.enabled)?.date ?? null,
       visitTypes: VISITS,

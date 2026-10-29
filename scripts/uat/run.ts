@@ -136,7 +136,7 @@ for (const p of P.filter((x) => !only || x.id === only)) {
   if (p.setup) {
     const { onboard } = await import("../../apps/server/test/harness");
     await onboard(h);
-    const acc = await h.db.patientAccount.findUniqueOrThrow({ where: { phoneHash: phoneHash(PATIENT) } });
+    const acc = await h.db.patientAccount.findFirstOrThrow({ where: { phoneHash: phoneHash(PATIENT) } });
     await createProfile(h.ctx, acc.id, "Ramesh Kumar", "SELF");
     if (p.setup === "self+mother") await createProfile(h.ctx, acc.id, "Sunita Devi", "MOTHER");
     h.wa.sent.length = 0;

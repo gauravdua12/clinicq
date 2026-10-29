@@ -10,7 +10,7 @@ let h: H;
 afterEach(async () => h?.close());
 
 async function accountId(h: H, wa: string): Promise<string> {
-  return (await h.db.patientAccount.findUniqueOrThrow({ where: { phoneHash: phoneHash(wa) } })).id;
+  return (await h.db.patientAccount.findFirstOrThrow({ where: { phoneHash: phoneHash(wa) } })).id;
 }
 const last = async (h: H, wa: string) => (await h.kinds(wa)).at(-1);
 
