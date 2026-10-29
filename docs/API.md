@@ -11,6 +11,7 @@ Base: `PUBLIC_BASE_URL`. JSON everywhere. Auth means an httpOnly `sid` cookie (S
 | POST | `/payments/webhook` | Razorpay (Phase 2, signature verified) |
 | GET | `/privacy` | privacy notice (current version, EN/HI) |
 | GET | `/healthz` | `{ok, db, jobs}` (no data) |
+| GET | `/api/pay/:token` | the patient's pay page data: clinic, amount, visit date, status, UPI link and QR. No patient details; 404 if unknown or cancelled |
 
 ## Auth
 | Method | Path | Body / Notes |
@@ -48,6 +49,14 @@ Base: `PUBLIC_BASE_URL`. JSON everywhere. Auth means an httpOnly `sid` cookie (S
 | POST | `/api/appointments/:id/cancel` | notifies the patient |
 | POST | `/api/appointments/:id/reschedule` | `{slotStart}` |
 | POST | `/api/slots/block` / `/api/slots/unblock` | `{slotStart}` |
+
+## Follow-ups and payments due (role: STAFF+)
+- `GET /api/followups` → upcoming follow-ups (from 14 days ago): `{id, name, phone (masked), dueDate, status: scheduled|reminded|booked}`.
+- `POST /api/followups {appointmentId | queueEntryId, dueDate}` → `{id, dueDate, remindOn}`. Replaces the patient's open follow-up. Errors: `bad_date`, `no_whatsapp`, `not_found`.
+- `DELETE /api/followups/:id` → cancels it (no reminder).
+- `GET /api/payments` → `{upiConfigured, rows: [{id, name, phone (masked), visitDate, amount, status, remindersSent, claimedPaid, paidAt}]}` (pending, plus paid in the last 30 days).
+- `POST /api/payments {appointmentId | queueEntryId, amount (₹)}` → sends the first message now → `{id, whatsappSent}`. Errors: `no_upi` (set the UPI ID first), `no_whatsapp`.
+- `POST /api/payments/:id/paid` (sends the receipt) · `/remind` (once per 12 h, else `too_soon`) · `/cancel`.
 
 ## Settings (role: DOCTOR)
 | Method | Path | Purpose |

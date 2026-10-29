@@ -5,7 +5,9 @@ export interface TemplateDef {
   name: string;
   category: "UTILITY" | "AUTHENTICATION";
   params: string[];
-  quickReplies?: string[]; // payload prefixes, in button order
+  quickReplies?: string[]; // payload prefixes, in button order (":<ref>" is appended when the send has a ref)
+  /** Dynamic URL button: the copy variable whose value ends the button's URL (e.g. the pay-page token). */
+  urlParam?: string;
 }
 
 export const TEMPLATES = {
@@ -18,7 +20,9 @@ export const TEMPLATES = {
   turn_near: { name: "turn_near", category: "UTILITY", params: ["name", "ahead", "eta"], quickReplies: ["menu:status"] },
   your_turn: { name: "your_turn", category: "UTILITY", params: ["name"] },
   walkin_token: { name: "walkin_token", category: "UTILITY", params: ["token", "name", "clinicName", "ahead", "eta"], quickReplies: ["menu:status"] },
-  followup_due: { name: "followup_due", category: "UTILITY", params: ["name", "doctor", "date"], quickReplies: ["menu:book"] },
+  followup_due: { name: "followup_due", category: "UTILITY", params: ["name", "doctor", "date"], quickReplies: ["fu"] },
+  payment_due: { name: "payment_due", category: "UTILITY", params: ["name", "amount", "clinicName", "date"], urlParam: "payToken" },
+  payment_received: { name: "payment_received", category: "UTILITY", params: ["name", "amount", "date"] },
   staff_walkin_overflow: { name: "staff_walkin_overflow", category: "UTILITY", params: ["session", "name", "maskedPhone"], quickReplies: ["ovf:yes", "ovf:no"] },
   daily_summary: { name: "daily_summary", category: "UTILITY", params: ["date", "booked", "walkins", "completed", "noShows", "avgWait"] },
   no_show_rebook: { name: "no_show_rebook", category: "UTILITY", params: ["name"], quickReplies: ["menu:book"] },

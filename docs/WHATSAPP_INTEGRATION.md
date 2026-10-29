@@ -61,7 +61,9 @@ Submit each in `en` and `hi`. Variables are positional. Keep wording non-promoti
 | `turn_near` | "{{1}} ji, your turn is coming up soon. {{2}} patients ahead of you (about {{3}} min)." | QR: Check status |
 | `your_turn` | "{{1}} ji, it's your turn now. Please proceed to Doctor's cabin." | |
 | `walkin_token` | "Token {{1}} for {{2}} ji at {{3}}. {{4}} patients ahead, about {{5}} min." | QR: Check status |
-| `followup_due` (Phase 2) | "{{1}} ji, your follow-up visit with {{2}} is due on {{3}}." | QR: Book now |
+| `followup_due` | "Hello {{1}} ji, your follow-up visit with {{2}} is due on {{3}}. Reply to book a time." | QR: Book now (payload `fu:<id>`) |
+| `payment_due` | "Hello {{1}} ji, a payment of ₹{{2}} is pending for your visit to {{3}} on {{4}}. You can pay at the clinic, or online using the button below." | URL: Pay now → `<base>/pay?t={{1}}` (pay-page token) |
+| `payment_received` | "Thank you {{1}} ji. We have received your payment of ₹{{2}} for your visit on {{3}}. Nothing more is due for this visit." | |
 | `staff_walkin_overflow` | "Walk-in quota full for the {{1}} session. {{2}} ({{3}}) is at reception. Can you adjust?" | QR: Yes adjust, No |
 | `daily_summary` (Phase 2) | "Today at {{1}}: {{2}} booked, {{3}} walk-ins, {{4}} completed, {{5}} no-shows, average wait {{6}} min." | |
 | `no_show_rebook` | "We missed you today, {{1}} ji. Reply to book another time." | QR: Book again |

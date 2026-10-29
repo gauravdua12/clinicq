@@ -1,6 +1,7 @@
 import { Prisma, decrypt, type Appointment, type VisitType } from "@clinicq/db";
 import { slots as S, time as T } from "@clinicq/core";
 import type { Ctx } from "../context";
+import { linkFollowUp } from "./reminders";
 import { clinicInfo, sessionForSlot, slotInstant, slotKey, type ClinicInfo } from "./clinic";
 import { audit } from "./notify";
 
@@ -80,6 +81,7 @@ export async function confirmHold(ctx: Ctx, apptId: string, visitType: VisitType
     return tx.appointment.update({ where: { id: apptId }, data: { status: "BOOKED", holdExpiresAt: null, visitType, token, bookedAt: now, source } });
   });
   await scheduleAppointmentJobs(ctx, info, booked);
+  if (booked.profileId) await linkFollowUp(ctx, booked.profileId, booked.id, booked.slotStart);
   await audit(ctx, source === "STAFF" ? "STAFF" : "PATIENT", null, "appointment.book", "Appointment", booked.id, { slotStart: booked.slotStart.toISOString(), token: booked.token });
   ctx.bus.publish({ type: "appointment.changed", id: booked.id, status: booked.status });
   return booked;

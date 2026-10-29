@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { Shell } from "@/lib/Shell";
+import { FollowUpModal, PaymentModal, RemindersPanel } from "@/lib/Reminders";
 
 interface Appt { id: string; date: string; time: string; token: string | null; status: string; visitType: string | null; source: string; name: string; phone: string | null }
 interface SlotRow { sessionLabel: string; startMin: number; time: string; status: string }
@@ -19,6 +20,9 @@ export default function Appointments() {
   const [slots, setSlots] = useState<SlotRow[]>([]);
   const [book, setBook] = useState<SlotRow | null>(null);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [visitAct, setVisitAct] = useState<{ kind: "fu" | "pay"; appt: Appt } | null>(null);
+  const [panelKey, setPanelKey] = useState(0);
+  const [view, setView] = useState<"schedule" | "reminders">("schedule");
   const days = useMemo(() => Array.from({ length: 8 }, (_, i) => addDays(today, i)), [today]);
 
   const load = useCallback(async () => {
@@ -32,9 +36,13 @@ export default function Appointments() {
   return (
     <Shell active="/appointments">
       <h1>Appointments</h1>
-      <div className="tabs">{days.map((d) => <button key={d} className={d === date ? "active" : ""} onClick={() => { setDate(d); setNotice(null); }}>{label(d)}</button>)}</div>
+      <div className="tabs" role="tablist" aria-label="View">
+        <button role="tab" aria-selected={view === "schedule"} className={view === "schedule" ? "active" : ""} onClick={() => setView("schedule")}>Schedule</button>
+        <button role="tab" aria-selected={view === "reminders"} className={view === "reminders" ? "active" : ""} onClick={() => setView("reminders")}>Follow-ups &amp; payments</button>
+      </div>
+      {view === "schedule" && <div className="tabs">{days.map((d) => <button key={d} className={d === date ? "active" : ""} onClick={() => { setDate(d); setNotice(null); }}>{label(d)}</button>)}</div>}
       {notice && <div className={notice.ok ? "ok" : "err"} role="status" style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", gap: 10 }}><span>{notice.text}</span><button className="ghost small" style={{ padding: 0 }} aria-label="Dismiss" onClick={() => setNotice(null)}>×</button></div>}
-      <div className="card">
+      {view === "schedule" && <div className="card">
         {slots.length === 0 && <div className="empty">Clinic closed on this day</div>}
         <table>
           <thead><tr><th>Time</th><th>Patient</th><th>Token</th><th>Status</th><th /></tr></thead>
@@ -49,6 +57,10 @@ export default function Appointments() {
                   <td>{a && <span className={`pill ${a.status === "NO_SHOW" ? "saffron" : a.status === "BOOKED" ? "blue" : "mint"}`}>{a.status.replace("_", " ").toLowerCase()}</span>}</td>
                   <td className="row" style={{ justifyContent: "flex-end" }}>
                     {a?.status === "BOOKED" && date === today && <button className="small" onClick={async () => { await api(`/api/appointments/${a.id}/arrive`, { body: {} }); void load(); }}>Arrived</button>}
+                    {a && ["ARRIVED", "COMPLETED"].includes(a.status) && a.phone && <>
+                      <button className="small ghost" onClick={() => setVisitAct({ kind: "fu", appt: a })}>Follow-up</button>
+                      <button className="small ghost" onClick={() => setVisitAct({ kind: "pay", appt: a })}>Payment due</button>
+                    </>}
                     {a?.status === "BOOKED" && <button className="small warn" onClick={async () => { if (confirm(`Cancel ${a.name}'s appointment? They'll be told on WhatsApp.`)) { await api(`/api/appointments/${a.id}/cancel`, { body: {} }); void load(); } }}>Cancel</button>}
                     {!a && s.status === "ok" && <button className="small" onClick={() => setBook(s)}>Book</button>}
                     {!a && (s.status === "ok" || s.status === "blocked") && <button className="small ghost" onClick={async () => { await api("/api/slots/block", { body: { date, startMin: s.startMin, blocked: s.status !== "blocked" } }); void load(); }}>{s.status === "blocked" ? "Unblock" : "Block"}</button>}
@@ -58,7 +70,10 @@ export default function Appointments() {
             })}
           </tbody>
         </table>
-      </div>
+      </div>}
+      {view === "reminders" && <RemindersPanel refreshKey={panelKey} onNotice={setNotice} />}
+      {visitAct?.kind === "fu" && <FollowUpModal visit={{ appointmentId: visitAct.appt.id }} name={visitAct.appt.name} onClose={() => setVisitAct(null)} onDone={(text) => { setVisitAct(null); setNotice({ ok: true, text }); setPanelKey((k) => k + 1); }} />}
+      {visitAct?.kind === "pay" && <PaymentModal visit={{ appointmentId: visitAct.appt.id }} name={visitAct.appt.name} onClose={() => setVisitAct(null)} onDone={(text, ok) => { setVisitAct(null); setNotice({ ok, text }); setPanelKey((k) => k + 1); }} />}
       {book && <BookModal date={date} slot={book} onClose={() => setBook(null)} onDone={(name, sent) => {
         setBook(null);
         setNotice(sent

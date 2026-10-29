@@ -5,6 +5,7 @@ import { clinicInfo, mapsLine, nowLocal } from "../services/clinic";
 import { sendToAccount } from "../services/notify";
 import { firstName } from "../services/patients";
 import { arriveAppointment } from "../services/queue";
+import { followUpDue, paymentRemindJob } from "../services/reminders";
 import { overflowTimeout } from "../services/walkin";
 
 // Scheduled jobs (docs/ARCHITECTURE.md §5). Payloads carry IDs only.
@@ -32,6 +33,9 @@ export function registerJobs(ctx: Ctx): void {
     const a = await ctx.db.appointment.findUnique({ where: { id: String(apptId) } });
     if (a?.status === "BOOKED") await arriveAppointment(ctx, a.id, { type: "SYSTEM", id: null });
   });
+
+  j.on("followUpDue", async ({ id }) => followUpDue(ctx, String(id)));
+  j.on("paymentRemind", async ({ id }) => paymentRemindJob(ctx, String(id)));
 
   j.on("overflowTimeout", async ({ requestId }) => overflowTimeout(ctx, String(requestId)));
 
@@ -89,6 +93,8 @@ export async function purge(ctx: Ctx): Promise<Record<string, number>> {
   out.queue = (await ctx.db.queueEntry.updateMany({ where: { arrivedAt: { lt: visitCut }, OR: [{ profileId: { not: null } }, { displayName: { not: null } }] }, data: { profileId: null, displayName: null } })).count;
   const inactiveCut = new Date(now - r.inactiveProfileMonths * 30 * day);
   out.accounts = (await ctx.db.patientAccount.deleteMany({ where: { lastActivityAt: { lt: inactiveCut } } })).count;
+  out.followUps = (await ctx.db.followUp.deleteMany({ where: { dueDate: { lt: visitCut } } })).count;
+  out.paymentsDue = (await ctx.db.paymentDue.deleteMany({ where: { status: { not: "PENDING" }, visitDate: { lt: visitCut } } })).count;
   out.audit = (await ctx.db.auditLog.deleteMany({ where: { at: { lt: new Date(now - r.auditDays * day) } } })).count;
   out.jobs = (await ctx.db.scheduledJob.deleteMany({ where: { doneAt: { lt: new Date(now - 7 * day) } } })).count;
   out.otp = (await ctx.db.otpChallenge.deleteMany({ where: { expiresAt: { lt: new Date(now) } } })).count;

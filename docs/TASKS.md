@@ -113,7 +113,8 @@ Ask the user before deviating from an approved decision (README "Key approved de
 ---
 ## Phase 2
 - [ ] P2.1 Booking fee toggle: Razorpay payment links, hold during payment, webhook confirm, refunds, policy text. PF-01…PF-03.
-- [ ] P2.2 Follow-ups: board quick-pick after completion, reminder job, booking prefill. FU-01, FU-02.
+- [x] P2.2 Follow-ups: board quick-pick after completion, reminder job, booking prefill. FU-01, FU-02.
+- [x] P2.2b Payment reminders: amount due, UPI pay page, repeat reminders, "paid" replies, receipts. PR-01…PR-04.
 - [ ] P2.3 Daily summary + Reports tab (aggregates only). RP-01, RP-02.
 - [ ] P2.4 Regional language (copy file + templates + extractor eval cases).
 - [ ] P2.5 (Optional) Second doctor: doctor selector in booking, per-doctor board.

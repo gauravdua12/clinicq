@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, fmtClock, subscribe, type EntryView, type QueueSnapshot } from "@/lib/api";
 import { Shell } from "@/lib/Shell";
 import { Stub } from "@/lib/Stub";
+import { FollowUpModal, PaymentModal } from "@/lib/Reminders";
 
 interface Overflow { id: string; name: string; expiresAt: string }
 
@@ -23,6 +24,15 @@ export default function QueueBoard() {
   const [overflow, setOverflow] = useState<Overflow[]>([]);
   const [callbacks, setCallbacks] = useState<string[]>([]);
   const [loadErr, setLoadErr] = useState(false);
+  // The patient whose consultation was just completed: offer a follow-up date or a payment due (FU-01).
+  const [justSeen, setJustSeen] = useState<{ id: string; name: string } | null>(null);
+  const [visitAct, setVisitAct] = useState<"fu" | "pay" | null>(null);
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => {
+    if (!justSeen || visitAct) return;
+    const t = setTimeout(() => setJustSeen(null), 60_000);
+    return () => clearTimeout(t);
+  }, [justSeen, visitAct]);
 
   const load = useCallback(async () => {
     try {
@@ -40,6 +50,7 @@ export default function QueueBoard() {
     void load();
     const off = subscribe("/api/events", (type, data) => {
       if (["queue.updated", "doctor.status", "overflow.requested", "overflow.resolved", "appointment.changed"].includes(type)) void load();
+      if (type === "payment.claimed") { const d = data as { name: string; amount: string }; setCallbacks((c) => [...c, `${d.name} says they've paid ₹${d.amount}. Check and mark it paid in Appointments → Follow-ups & payments.`]); }
       if (type === "callback.requested") setCallbacks((c) => [...c, `${(data as { name: string }).name} (${(data as { maskedPhone: string }).maskedPhone}) asked for a call back`]);
     });
     const t = setInterval(load, 30_000);
@@ -48,9 +59,11 @@ export default function QueueBoard() {
 
   const act = async (path: string, body: unknown = {}) => {
     setBusy(true); setMsg(null);
+    const seen = path === "/api/queue/advance" && snap?.inConsult?.hasWhatsApp ? { id: snap.inConsult.id, name: snap.inConsult.name } : null;
     try {
       const r = await api<QueueSnapshot | { informed: number }>(path, { body });
       if (r && "waiting" in r) setSnap(r); else await load();
+      if (seen) { setJustSeen(seen); setNotice(null); }
     } catch (e) {
       setMsg(e instanceof ApiError && e.code === "STALE" ? "Someone else just updated the board. It has been refreshed." : "That didn't go through. Try again.");
       await load();
@@ -70,6 +83,15 @@ export default function QueueBoard() {
         <div key={i} className="banner"><span style={{ flex: 1 }}>{c}</span><button className="ghost" onClick={() => setCallbacks((x) => x.filter((_, j) => j !== i))}>Dismiss</button></div>
       ))}
       {msg && <div className="err" style={{ marginBottom: 12 }}>{msg}</div>}
+      {justSeen && (
+        <div className="banner" role="status">
+          <span style={{ flex: 1 }}>{justSeen.name}&apos;s consultation is done.</span>
+          <button onClick={() => setVisitAct("fu")}>Set follow-up</button>
+          <button onClick={() => setVisitAct("pay")}>Payment due</button>
+          <button className="ghost" aria-label="Dismiss" onClick={() => setJustSeen(null)}>×</button>
+        </div>
+      )}
+      {notice && <div className={notice.ok ? "ok" : "err"} role="status" style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", gap: 10 }}><span>{notice.text}</span><button className="ghost small" style={{ padding: 0 }} aria-label="Dismiss" onClick={() => setNotice(null)}>×</button></div>}
       {loadErr && <div className="err" style={{ marginBottom: 12 }}>Connection lost. Showing the last known queue; retrying…</div>}
 
       <div className="board">
@@ -111,6 +133,8 @@ export default function QueueBoard() {
         </section>
       </div>
 
+      {justSeen && visitAct === "fu" && <FollowUpModal visit={{ queueEntryId: justSeen.id }} name={justSeen.name} onClose={() => setVisitAct(null)} onDone={(text) => { setVisitAct(null); setJustSeen(null); setNotice({ ok: true, text }); }} />}
+      {justSeen && visitAct === "pay" && <PaymentModal visit={{ queueEntryId: justSeen.id }} name={justSeen.name} onClose={() => setVisitAct(null)} onDone={(text, ok) => { setVisitAct(null); setJustSeen(null); setNotice({ ok, text }); }} />}
       {addOpen && <AddWalkin onClose={() => setAddOpen(false)} onDone={(s) => { setSnap(s); setAddOpen(false); }} />}
       {overflow[0] && <OverflowPopup req={overflow[0]} onDone={load} />}
     </Shell>

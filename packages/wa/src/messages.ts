@@ -12,7 +12,7 @@ export type OutMsg =
   | { kind: "flow"; body: string; cta: string; flowId: string; flowToken: string; screen: string; data?: Record<string, unknown>; draft?: boolean }
   | { kind: "contact"; name: string; phone: string }
   | { kind: "cta_url"; body: string; displayText: string; url: string }
-  | { kind: "template"; name: string; lang: string; bodyParams: string[]; quickReplyPayloads?: string[]; otpCode?: string };
+  | { kind: "template"; name: string; lang: string; bodyParams: string[]; quickReplyPayloads?: string[]; urlButtonParam?: string; otpCode?: string };
 
 export class MessageLimitError extends Error {}
 
@@ -104,6 +104,8 @@ export function toCloudPayload(to: string, m: OutMsg): Record<string, unknown> {
           components: [
             ...(m.bodyParams.length ? [{ type: "body", parameters: m.bodyParams.map((t) => ({ type: "text", text: t })) }] : []),
             ...(m.quickReplyPayloads ?? []).map((p, i) => ({ type: "button", sub_type: "quick_reply", index: String(i), parameters: [{ type: "payload", payload: p }] })),
+            // Dynamic URL button (e.g. the pay page): the variable part that ends the template's URL.
+            ...(m.urlButtonParam ? [{ type: "button", sub_type: "url", index: String(m.quickReplyPayloads?.length ?? 0), parameters: [{ type: "text", text: m.urlButtonParam }] }] : []),
             // Authentication templates: the copy-code button must carry the same code (Meta rejects the send otherwise).
             ...(m.otpCode ? [{ type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: m.otpCode }] }] : []),
           ],

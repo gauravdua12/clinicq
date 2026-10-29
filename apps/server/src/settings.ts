@@ -27,6 +27,15 @@ export const ClinicSettings = z.object({
   slotPicker: z.enum(["page", "chat"]).default("page"),
   fees: z.string().default(""),
   payments: z.object({ enabled: z.boolean().default(false), amountPaise: z.number().default(0) }).default({ enabled: false, amountPaise: 0 }),
+  /** Follow-up visits the doctor asks for: the patient is reminded this many days before the due date (FU-02). */
+  followUp: z.object({ remindDaysBefore: z.number().int().min(0).max(14).default(2) }).default({ remindDaysBefore: 2 }),
+  /** Payment reminders for amounts due: where patients pay online (UPI), and how often to remind (PR-01…PR-04). */
+  paymentReminders: z.object({
+    upiId: z.string().trim().max(80).default(""),
+    payeeName: z.string().trim().max(60).default(""),
+    remindEveryDays: z.number().int().min(1).max(30).default(3),
+    maxReminders: z.number().int().min(0).max(5).default(2),
+  }).default({ upiId: "", payeeName: "", remindEveryDays: 3, maxReminders: 2 }),
   retention: z.object({
     messageLogDays: z.number().default(90),
     visitAnonymiseDays: z.number().default(180),

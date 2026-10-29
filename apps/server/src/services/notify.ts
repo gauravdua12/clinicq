@@ -1,5 +1,5 @@
 import { decrypt } from "@clinicq/db";
-import { TEMPLATES, templateLang, type OutMsg, type TemplateName } from "@clinicq/wa";
+import { TEMPLATES, templateLang, type OutMsg, type TemplateDef, type TemplateName } from "@clinicq/wa";
 import type { Ctx } from "../context";
 
 // Window-aware sender (docs/WHATSAPP_INTEGRATION.md §3). Logs only copy IDs / template names.
@@ -29,13 +29,16 @@ export async function sendTo(ctx: Ctx, waId: string, msg: OutMsg, o: SendOpts): 
         await logOut(ctx, o.accountId, `skipped_outside_window:${o.kind}`);
         return false;
       }
-      const def = TEMPLATES[o.template.name];
+      const def: TemplateDef = TEMPLATES[o.template.name];
+      const vars = o.template.vars;
+      const ref = vars.ref ?? vars.apptId; // e.g. "appt:cx:<id>", "fu:<id>"
       out = {
         kind: "template",
         name: def.name,
         lang: templateLang(o.template.lang),
-        bodyParams: def.params.map((p) => String(o.template!.vars[p] ?? "")),
-        quickReplyPayloads: (def as { quickReplies?: string[] }).quickReplies?.map((q) => (o.template!.vars.apptId ? `${q}:${o.template!.vars.apptId}` : q)),
+        bodyParams: def.params.map((p) => String(vars[p] ?? "")),
+        quickReplyPayloads: def.quickReplies?.map((q) => (ref ? `${q}:${ref}` : q)),
+        urlButtonParam: def.urlParam ? String(vars[def.urlParam] ?? "") : undefined,
       };
     }
   }

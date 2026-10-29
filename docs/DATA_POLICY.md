@@ -17,7 +17,8 @@
 | Appointment | profileId, slotStart, visitType enum, status, token, source, timestamps, fee status | **No reason or notes field** |
 | QueueEntry | token, state, timestamps, expectedAt, position overrides | |
 | WalkinOverflowRequest | profileId, decision, decidedBy, assignedTime | |
-| FollowUp | profileId, dueDate | **No reason** |
+| FollowUp | profileId, doctorId, dueDate, remindedAt, bookedAppointmentId, cancelledAt, createdById | **No reason** |
+| PaymentDue | profileId, doctorId, visitDate, amountPaise, status (PENDING/PAID/CANCELLED), payToken, reminder counts, claimedPaidAt, paidAt | **No reason, description or bill items.** The patient pays the clinic directly (UPI or at the clinic); no UPI or card details are stored |
 | Payment | provider order ID, amount, status, refund status | No UPI or card details |
 | MessageLog | direction, templateName or copyId, wamid, status, timestamps | **No message body** |
 | AuditLog | actor, action, entity, entityId, timestamp, small diff of logistics fields | |
@@ -47,6 +48,8 @@
 | Appointment / QueueEntry | 180 days after visit | anonymise: drop profileId, keep date/slot/status/source for aggregate reports |
 | PatientProfile / PatientAccount | 12 months after last activity | delete (cascade; anonymise linked visits first) |
 | Payment | 8 years (tax and accounting law) | keep amount, date, order ID; unlink from profile after 180 days |
+| FollowUp | 180 days after the due date | delete |
+| PaymentDue | 180 days after the visit, once paid or cancelled (pending ones stay until settled) | delete. The clinic's own accounts are its record of payment |
 | AuditLog | 1 year | delete |
 | ConsentRecord | life of account + 1 year | delete |
 | Backups | 14 days rolling | deleted data disappears from backups within 14 days |

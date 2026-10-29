@@ -132,6 +132,8 @@ model PatientProfile {
   createdAt    DateTime        @default(now())
   appointments Appointment[]
   queueEntries QueueEntry[]
+  followUps    FollowUp[]
+  paymentsDue  PaymentDue[]
 }
 
 enum Relation {
@@ -312,13 +314,49 @@ model DailyWalkinCode {
   @@id([clinicId, date])
 }
 
+// A follow-up visit the doctor asked for (docs/PRD.md FU-01, FU-02). Date only: never why.
 model FollowUp {
-  id                  String    @id @default(cuid())
+  id                  String         @id @default(cuid())
   profileId           String
+  profile             PatientProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
   doctorId            String
-  dueDate             DateTime  @db.Date
+  dueDate             DateTime       @db.Date
   remindedAt          DateTime?
   bookedAppointmentId String?
+  cancelledAt         DateTime?
+  createdById         String?
+  createdAt           DateTime       @default(now())
+
+  @@index([profileId])
+  @@index([dueDate])
+}
+
+// An amount the clinic says is due for a visit, and whether it's paid (docs/PRD.md PR-01…PR-04).
+// Amount, date and status only: never what it was for.
+model PaymentDue {
+  id             String           @id @default(cuid())
+  profileId      String
+  profile        PatientProfile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  doctorId       String
+  visitDate      DateTime         @db.Date
+  amountPaise    Int
+  status         PaymentDueStatus @default(PENDING)
+  payToken       String           @unique // opaque id for the patient's pay page
+  remindersSent  Int              @default(0)
+  lastRemindedAt DateTime?
+  claimedPaidAt  DateTime? // the patient replied that they've paid; staff confirm
+  paidAt         DateTime?
+  createdById    String?
+  createdAt      DateTime         @default(now())
+
+  @@index([doctorId, status])
+  @@index([profileId])
+}
+
+enum PaymentDueStatus {
+  PENDING
+  PAID
+  CANCELLED
 }
 
 model Payment {

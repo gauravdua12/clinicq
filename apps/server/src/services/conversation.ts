@@ -10,6 +10,7 @@ import { clinicInfo, mapsLine, nowLocal, sessionHours, sessionsText, slotInstant
 import { audit, sendTo } from "./notify";
 import { createProfile, findOrCreateAccount, firstName, hasConsent, matchProfileByName, profileLabels, profilesOf, recordConsent, RELATION_LABEL, waName, type ProfileView } from "./patients";
 import { arriveAppointment, notifyIfNext, positionOf } from "./queue";
+import { amountText, claimPaid, followUpForBooking } from "./reminders";
 import { requestWalkin, setOverflowDeclinedHandler, validateWalkinCode, WALKIN_RE } from "./walkin";
 import { handleStaffMessage } from "./staffCommands";
 
@@ -69,6 +70,8 @@ const COMPLAINT_RE = /\b(complaint|complain|complaints|shikayat|shikaayat|shikay
 const ABANDON_RE = /\b(don'?t|do not|dont)\s+(want|need)\b|\bno need\b|\bnot now\b|\bleave it\b|\bforget it\b|\bnahi?n?\s+(chahiye|karna|karni)\b|\brehne\s+do\b|\bchh?o+d\s*do\b|\bmat\s+karo\b|नहीं\s+चाहिए|रहने\s+दो|छोड़\s+दो|मत\s+करो/i;
 const RESTART_RE = /^\s*(start\s+(over|again|fresh)|restart|reset|new\s+chat|shuru\s+se|phir\s+se\s+shuru|फिर\s+से\s+शुरू|शुरू\s+से)\b/i;
 /** Buttons from a conversation that has since been reset; they no longer carry enough context to continue. */
+/** "I've paid", "payment done", "paise bhej diye", "pay kar diya", "भुगतान कर दिया" (in memory only). */
+const PAID_RE = /\b(i('ve| have)? paid|paid( it| the| now| already)?|payment (done|made|sent|completed|kar di(ya)?|ho gay[ai])|already paid|pay kar (diya|di)|paise? bhej (diye|diya|di)|transfer kar (diya|diye)|upi kar (diya|di))\b|भुगतान कर (दिया|दी)|पेमेंट कर (दिया|दी)|पैसे भेज (दिए|दिये)/i;
 const STALE_BUTTON = /^(slot|vt|bk|see_all|sess|who|resume|rsday)(:|$)/;
 
 /** "English please", "hindi mein baat karo", "switch to Hinglish" → the language asked for (null if none named). */
@@ -298,6 +301,15 @@ async function onText(t: Turn, text: string, isVoice: boolean): Promise<void> {
     if (!t.conv.langLock) t.conv.lang = /[ऀ-ॿ]/.test(text) ? "hi" : /\b(shikayat|shikaayat|karni|hai|kaise|kahan|kisse)\b/i.test(text) ? "hinglish" : t.conv.lang;
     await t.text("GRIEVANCE_INFO");
     return t.conv.state.startsWith("BK_") || t.conv.state.startsWith("CX_") || t.conv.state.startsWith("RS_") ? reprompt(t) : undefined;
+  }
+  // "Paid" / "payment done" / "pay kar diya" while the clinic has an amount pending: tell the clinic, stop the reminders.
+  if (PAID_RE.test(text) && text.trim().split(/\s+/).length <= 10 && !/\b(book|appointment|cancel|reschedule)\b/i.test(text)) {
+    const due = await claimPaid(t.ctx, t.acc.id);
+    if (due) {
+      if (!t.conv.langLock) t.conv.lang = /[ऀ-ॿ]/.test(text) ? "hi" : /\b(kar|diya|ho|gaya|kiya|bhej)\b/i.test(text) ? "hinglish" : t.conv.lang;
+      await t.text("PAYMENT_CLAIMED", { nameJi: t.nameJi(senderName(t)), amount: amountText(due.amountPaise) });
+      return t.conv.state.startsWith("BK_") || t.conv.state.startsWith("CX_") ? reprompt(t) : undefined;
+    }
   }
   // "all / both / saare / dono": every upcoming appointment (for cancelling), whatever else the message says.
   t.negated = /\b(no|nahi|nahin|na|mat|don'?t|not|keep)\b|नहीं|मत/i.test(text);
@@ -651,6 +663,15 @@ async function onButton(t: Turn, id: string): Promise<void> {
     case "erase": if (a === "yes") return erase(t); t.set("IDLE"); return t.text("ERASE_KEPT");
     case "race": return a === "another" ? askWhen(t) : callClinic(t);
     case "call": return callClinic(t);
+    case "fu": { // "Book" on a follow-up reminder: that patient, a follow-up visit, from the due date
+      const fu = a ? await followUpForBooking(t.ctx, a, t.acc.id) : null;
+      if (!fu) { t.set("IDLE"); return t.buttons(t.t("FOLLOWUP_GONE"), "FOLLOWUP_GONE", [{ id: "menu:book", title: t.b("BOOK") }]); }
+      if (t.conv.held) { await releaseHold(t.ctx, t.conv.held); t.conv.held = undefined; }
+      t.conv.p = { intent: "BOOK", profileId: fu.profileId, visitType: "FOLLOW_UP", date: fu.date };
+      t.conv.offered = undefined;
+      t.conv.requested = { date: fu.date };
+      return progressBooking(t);
+    }
     case "menu":
       if (a === "book") { t.conv.p = { intent: "BOOK", profileId: t.conv.p.profileId }; return progressBooking(t); }
       if (a === "status") return status(t);

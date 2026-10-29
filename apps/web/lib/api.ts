@@ -25,7 +25,7 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
 
 export function subscribe(path: string, onEvent: (type: string, data: unknown) => void): () => void {
   const es = new EventSource(`${API}${path}`, { withCredentials: true });
-  const types = ["queue.updated", "appointment.changed", "overflow.requested", "overflow.resolved", "doctor.status", "callback.requested", "system.alert"];
+  const types = ["queue.updated", "appointment.changed", "overflow.requested", "overflow.resolved", "doctor.status", "callback.requested", "system.alert", "payment.claimed"];
   for (const t of types) es.addEventListener(t, (e) => onEvent(t, JSON.parse((e as MessageEvent).data)));
   return () => es.close();
 }

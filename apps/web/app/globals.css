@@ -281,3 +281,12 @@ button.bk-date:focus-visible, button.bk-slot:focus-visible, button.bk-visit:focu
 .picker-choice legend { font: 700 14px var(--font-display); padding: 0 6px; }
 .picker-choice label { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0 0; font-weight: 400; cursor: pointer; }
 .picker-choice input[type="radio"] { width: auto; min-height: 0; margin-top: 4px; }
+
+/* Follow-ups and payments due: stacked rows that wrap on a phone (no sideways scrolling). */
+.rem-list { list-style: none; margin: 0 0 8px; padding: 0; }
+.rem-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.rem-main { min-width: 0; }
+.rem-amt { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rem-acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.rem-acts:empty { display: none; }
+@media (min-width: 760px) { .rem-row { grid-template-columns: 1fr auto auto; } .rem-acts { grid-column: auto; justify-content: flex-end; } }

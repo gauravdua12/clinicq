@@ -11,7 +11,7 @@
  *   npm run meta -- send-test --to 9198xxxxxx  send Meta's hello_world template
  */
 import { existsSync, readFileSync } from "node:fs";
-import { TEMPLATES, TEMPLATE_TEXT } from "../../packages/wa/src/index";
+import { TEMPLATES, TEMPLATE_TEXT, templateComponents } from "../../packages/wa/src/index";
 
 for (const f of [".env"]) if (existsSync(f)) process.loadEnvFile(f);
 const V = process.env.WA_GRAPH_VERSION ?? "v23.0";
@@ -76,9 +76,7 @@ if (cmd === "check") {
       continue;
     }
     for (const lang of ["en", "hi"] as const) {
-      const t = TEMPLATE_TEXT[name as keyof typeof TEMPLATE_TEXT][lang];
-      const components: unknown[] = [{ type: "BODY", text: t.body, example: { body_text: [t.examples] } }];
-      if (t.buttons?.length) components.push({ type: "BUTTONS", buttons: t.buttons });
+      const components = templateComponents(name as keyof typeof TEMPLATE_TEXT, lang, `${process.env.PUBLIC_BASE_URL ?? ""}${process.env.BASE_PATH ?? ""}`);
       const metaName = def.name; // may differ from our key (e.g. a template renamed after a rejection)
       const cur = existing.get(`${metaName}/${lang}`);
       if (cur && cur.status !== "REJECTED") { console.log(`${metaName}/${lang}: ${cur.status}`); continue; }

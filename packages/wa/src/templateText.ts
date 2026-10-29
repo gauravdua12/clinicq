@@ -6,11 +6,13 @@ import { TEMPLATES, type TemplateName } from "./templates";
 export interface TemplateText {
   body: string;
   examples: string[];
-  buttons?: { type: "QUICK_REPLY"; text: string }[] | { type: "PHONE_NUMBER"; text: string; phone: string }[];
+  buttons?: { type: "QUICK_REPLY"; text: string }[] | { type: "PHONE_NUMBER"; text: string; phone: string }[] | { type: "URL"; text: string; url: string; example: string[] }[];
 }
 
 type Lang = "en" | "hi";
 const qr = (...t: string[]) => t.map((text) => ({ type: "QUICK_REPLY" as const, text }));
+/** "{{BASE}}" is replaced with the server's public address when the template is submitted (scripts/meta). */
+const payBtn = (text: string) => [{ type: "URL" as const, text, url: "{{BASE}}/pay?t={{1}}", example: ["{{BASE}}/pay?t=Xy7Kq2Lm9Pa4"] }];
 
 export const TEMPLATE_TEXT: Record<Exclude<TemplateName, "staff_login_otp">, Record<Lang, TemplateText>> = {
   appointment_confirmed: {
@@ -49,6 +51,14 @@ export const TEMPLATE_TEXT: Record<Exclude<TemplateName, "staff_login_otp">, Rec
     en: { body: "Hello {{1}} ji, your follow-up visit with {{2}} is due on {{3}}. Reply to book a time.", examples: ["Sunita", "Dr. Sharma", "17 Oct"], buttons: qr("Book now") },
     hi: { body: "नमस्ते {{1}} जी, {{2}} के साथ आपकी फ़ॉलो-अप विज़िट {{3}} को है। समय बुक करने के लिए जवाब दें।", examples: ["सुनीता", "डॉ. शर्मा", "17 अक्टू"], buttons: qr("अभी बुक करें") },
   },
+  payment_due: {
+    en: { body: "Hello {{1}} ji, a payment of ₹{{2}} is pending for your visit to {{3}} on {{4}}. You can pay at the clinic, or online using the button below.", examples: ["Ramesh", "500", "Dr. Sharma's Clinic", "20 Oct"], buttons: payBtn("Pay now") },
+    hi: { body: "नमस्ते {{1}} जी, ₹{{2}} का भुगतान बाकी है: {{3}} में {{4}} की विज़िट। आप क्लिनिक पर या नीचे दिए बटन से ऑनलाइन भुगतान कर सकते हैं।", examples: ["रमेश", "500", "डॉ. शर्मा क्लिनिक", "20 अक्टू"], buttons: payBtn("अभी भुगतान करें") },
+  },
+  payment_received: {
+    en: { body: "Thank you {{1}} ji. We have received your payment of ₹{{2}} for your visit on {{3}}. Nothing more is due for this visit.", examples: ["Ramesh", "500", "20 Oct"] },
+    hi: { body: "धन्यवाद {{1}} जी। आपका ₹{{2}} का भुगतान मिल गया है ({{3}} की विज़िट)। इस विज़िट का अब कुछ बाकी नहीं है।", examples: ["रमेश", "500", "20 अक्टू"] },
+  },
   staff_walkin_overflow: {
     en: { body: "Walk-in list is full for the {{1}} session. {{2}} ({{3}}) is at reception. Can you adjust?", examples: ["Evening", "Anil Verma", "+91 99887 xxxxx"], buttons: qr("Yes adjust", "No") },
     hi: { body: "आज के {{1}} सेशन की वॉक-इन सूची भर गई है। {{2}} ({{3}}) रिसेप्शन पर हैं। क्या एडजस्ट कर सकते हैं?", examples: ["शाम", "अनिल वर्मा", "+91 99887 xxxxx"], buttons: qr("हाँ", "नहीं") },
@@ -62,6 +72,14 @@ export const TEMPLATE_TEXT: Record<Exclude<TemplateName, "staff_login_otp">, Rec
     hi: { body: "आज आप नहीं आ पाए, {{1}} जी। दूसरा समय बुक करने के लिए जवाब दें।", examples: ["रमेश"], buttons: qr("फिर से बुक करें") },
   },
 };
+
+/** Graph API `components` for submitting a template; `base` is the server's public address (for URL buttons). */
+export function templateComponents(name: Exclude<TemplateName, "staff_login_otp">, lang: Lang, base: string): unknown[] {
+  const t = TEMPLATE_TEXT[name][lang];
+  const components: unknown[] = [{ type: "BODY", text: t.body, example: { body_text: [t.examples] } }];
+  if (t.buttons?.length) components.push({ type: "BUTTONS", buttons: JSON.parse(JSON.stringify(t.buttons).replaceAll("{{BASE}}", base.replace(/\/$/, ""))) });
+  return components;
+}
 
 export function templateNames(): TemplateName[] {
   return Object.keys(TEMPLATES) as TemplateName[];

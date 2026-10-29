@@ -117,7 +117,13 @@ IDs are referenced in `TASKS.md` and the tests.
 
 ### M11: Follow-ups (Phase 2)
 - **FU-01** After Consultation completed, the board shows [Follow-up: 7d / 15d / 30d / custom] for 10 s, then fades.
-- **FU-02** 2 days before the due date: `followup_due` with [Book now] → booking flow pre-set to that date (smart suggest).
+- **FU-02** `followUp.remindDaysBefore` (default 2) days before the due date, 10:00: `followup_due` with [Book now] → booking pre-set to that patient, that date and visit type Follow-up. No reminder if they've already booked; a booking from a week before the due date onwards fulfils it. Staff can also set it from a visit in Appointments, and see/cancel them in Appointments → Follow-ups & payments.
+
+### M11b: Payment reminders (built Oct 2026)
+- **PR-01** Staff enter an amount due for a visit (queue board after the consultation, or Appointments). Amount and date only, never what it was for. Needs the clinic's UPI ID (Settings → Clinic).
+- **PR-02** The patient gets `payment_due` (utility) with a "Pay now" button to a pay page: amount, UPI app link with the amount filled in, QR code, "or pay at the clinic". The page shows no patient details. Q-Incolo never handles the money.
+- **PR-03** Reminders every `remindEveryDays` (3) at 11:00, at most `maxReminders` (2) after the first message; staff can "Remind now" (once per 12 h). Patients opted out of reminders get none.
+- **PR-04** The patient replying "paid" / "pay kar diya" / "भुगतान कर दिया" stops the reminders and alerts the staff ("says they've paid"); staff "Mark paid" sends `payment_received`.
 
 ### M12: Reports and daily summary (Phase 2)
 - **RP-01** The daily summary goes to the doctor's WhatsApp 15 min after the last session ends: booked, walk-ins, completed, no-shows, cancellations, average wait, average consult time, fees collected.

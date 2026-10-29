@@ -32,7 +32,9 @@ function useSaved() {
   return { state, ok: (m = "Saved") => setState({ ok: m }), err: (m: string) => setState({ err: m }), clear: () => setState({}) };
 }
 
-interface ClinicData { name: string; addressShort: string; addressFull: string; mapsUrl: string | null; phone: string; doctorName: string; qualification: string | null; settings: Record<string, unknown> & { fees?: string; windowDays?: number; cutoffMinutes?: number; walkinOverflowTimeoutMinutes?: number; turnNearThreshold?: number; flowsEnabled?: boolean; slotPicker?: "page" | "chat" } }
+interface ClinicData { name: string; addressShort: string; addressFull: string; mapsUrl: string | null; phone: string; doctorName: string; qualification: string | null; settings: Record<string, unknown> & { fees?: string; windowDays?: number; cutoffMinutes?: number; walkinOverflowTimeoutMinutes?: number; turnNearThreshold?: number; flowsEnabled?: boolean; slotPicker?: "page" | "chat"; followUp?: { remindDaysBefore: number }; paymentReminders?: PayCfg } }
+interface PayCfg { upiId: string; payeeName: string; remindEveryDays: number; maxReminders: number }
+const PAY_DEFAULT: PayCfg = { upiId: "", payeeName: "", remindEveryDays: 3, maxReminders: 2 };
 
 function ClinicTab() {
   const [d, setD] = useState<ClinicData | null>(null);
@@ -66,6 +68,20 @@ function ClinicTab() {
         <label><input type="radio" name="slotPicker" checked={d.settings.slotPicker === "chat"} onChange={() => setS("slotPicker", "chat")} />
           <span><b>In the chat</b><br /><span className="small muted">The bot suggests the nearest times as buttons; "See all slots" lists Morning or Evening times.</span></span></label>
         <p className="small muted" style={{ margin: "6px 0 0" }}>Either way, a patient can just type a time, and nothing is booked before they confirm.</p>
+      </fieldset>
+      <fieldset className="picker-choice">
+        <legend>Follow-up and payment reminders</legend>
+        <label htmlFor="fu-days" style={{ display: "block" }}>Remind about a follow-up visit (days before it's due)</label>
+        <input id="fu-days" type="number" min={0} max={14} value={d.settings.followUp?.remindDaysBefore ?? 2} onChange={(e) => setS("followUp", { remindDaysBefore: Number(e.target.value) })} />
+        <label htmlFor="upi" style={{ display: "block" }}>UPI ID for online payments</label>
+        <input id="upi" value={(d.settings.paymentReminders ?? PAY_DEFAULT).upiId} placeholder="clinicname@okicici" onChange={(e) => setS("paymentReminders", { ...PAY_DEFAULT, ...d.settings.paymentReminders, upiId: e.target.value.trim() })} />
+        <label htmlFor="payee" style={{ display: "block" }}>Name shown in the UPI app</label>
+        <input id="payee" value={(d.settings.paymentReminders ?? PAY_DEFAULT).payeeName} placeholder={d.name} onChange={(e) => setS("paymentReminders", { ...PAY_DEFAULT, ...d.settings.paymentReminders, payeeName: e.target.value })} />
+        <div className="row">
+          <div style={{ flex: 1 }}><label htmlFor="pay-every">Remind again every (days)</label><input id="pay-every" type="number" min={1} max={30} value={(d.settings.paymentReminders ?? PAY_DEFAULT).remindEveryDays} onChange={(e) => setS("paymentReminders", { ...PAY_DEFAULT, ...d.settings.paymentReminders, remindEveryDays: Number(e.target.value) })} /></div>
+          <div style={{ flex: 1 }}><label htmlFor="pay-max">Reminders after the first message</label><input id="pay-max" type="number" min={0} max={5} value={(d.settings.paymentReminders ?? PAY_DEFAULT).maxReminders} onChange={(e) => setS("paymentReminders", { ...PAY_DEFAULT, ...d.settings.paymentReminders, maxReminders: Number(e.target.value) })} /></div>
+        </div>
+        <p className="small muted" style={{ margin: "6px 0 0" }}>Payment reminders need the UPI ID: patients get a "Pay now" button that opens your UPI details and QR code. Patients can also pay at the clinic.</p>
       </fieldset>
       <button className="primary" style={{ marginTop: 14 }} onClick={async () => {
         try { await api("/api/settings/clinic", { method: "PUT", body: { name: d.name, addressShort: d.addressShort, addressFull: d.addressFull, mapsUrl: d.mapsUrl, phone: d.phone, doctorName: d.doctorName, qualification: d.qualification, settings: d.settings } }); s.ok(); }

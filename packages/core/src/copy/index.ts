@@ -354,6 +354,31 @@ export const COPY = {
     hi: "हमने टोकन {{token}} बुलाया पर आप नहीं मिले। वापस आने पर \"पहुँच गया\" लिखें, मैं आपको फिर से कतार में जोड़ दूँगी।",
     hinglish: "Humne token {{token}} bulaya par aap nahi mile. Wapas aakar \"reached\" likhiye, main phir se queue mein add kar doongi.",
   },
+  FOLLOWUP_DUE: {
+    en: "Hello {{name}} ji, your follow-up visit with {{doctor}} is due on {{date}}. Would you like to book a time?",
+    hi: "नमस्ते {{name}} जी, {{doctor}} के साथ आपकी फ़ॉलो-अप विज़िट {{date}} को है। क्या समय बुक करें?",
+    hinglish: "Namaste {{name}} ji, {{doctor}} ke saath aapki follow-up visit {{date}} ko hai. Time book karein?",
+  },
+  FOLLOWUP_GONE: {
+    en: "That follow-up reminder is no longer active. Would you like to book a visit?",
+    hi: "यह फ़ॉलो-अप रिमाइंडर अब लागू नहीं है। क्या आप विज़िट बुक करना चाहेंगे?",
+    hinglish: "Yeh follow-up reminder ab active nahi hai. Visit book karni hai?",
+  },
+  PAYMENT_DUE: {
+    en: "Hello {{name}} ji, a payment of ₹{{amount}} is pending for your visit to {{clinicName}} on {{date}}. You can pay at the clinic, or online with the button below.",
+    hi: "नमस्ते {{name}} जी, {{date}} को {{clinicName}} में आपकी विज़िट का ₹{{amount}} का भुगतान बाकी है। आप क्लिनिक पर या नीचे दिए बटन से ऑनलाइन भुगतान कर सकते हैं।",
+    hinglish: "Namaste {{name}} ji, {{date}} ko {{clinicName}} mein aapki visit ka ₹{{amount}} payment baaki hai. Aap clinic par ya neeche diye button se online pay kar sakte hain.",
+  },
+  PAYMENT_RECEIVED: {
+    en: "Thank you {{name}} ji 🙏 We've received your payment of ₹{{amount}} for your visit on {{date}}.",
+    hi: "धन्यवाद {{name}} जी 🙏 {{date}} की विज़िट के लिए आपका ₹{{amount}} का भुगतान मिल गया है।",
+    hinglish: "Thank you {{name}} ji 🙏 {{date}} ki visit ke liye aapka ₹{{amount}} ka payment mil gaya hai.",
+  },
+  PAYMENT_CLAIMED: {
+    en: "Thank you{{nameJi}} 🙏 I've told the clinic you've paid ₹{{amount}}. They'll confirm once they see it.",
+    hi: "धन्यवाद{{nameJi}} 🙏 मैंने क्लिनिक को बता दिया है कि आपने ₹{{amount}} का भुगतान कर दिया है। वे देखकर कन्फ़र्म कर देंगे।",
+    hinglish: "Thank you{{nameJi}} 🙏 Maine clinic ko bata diya hai ki aapne ₹{{amount}} pay kar diya hai. Woh dekh kar confirm kar denge.",
+  },
   NO_SHOW_MISSED: {
     en: "We missed you today, {{name}} ji. Would you like to book another time?",
     hi: "आज आप नहीं आ पाए, {{name}} जी। क्या दूसरा समय बुक करें?",
@@ -744,6 +769,7 @@ export const BTN = {
   MENU: { en: "Menu", hi: "मेन्यू", hinglish: "Menu" },
   MY_APPTS: { en: "My appointments", hi: "मेरे अपॉइंटमेंट", hinglish: "Mere appointments" },
   QUEUE_STATUS: { en: "Queue status", hi: "कतार की स्थिति", hinglish: "Queue status" },
+  PAY_NOW: { en: "Pay now", hi: "अभी भुगतान करें", hinglish: "Abhi pay karein" },
   BOOK_AGAIN: { en: "Book again", hi: "फिर से बुक करें", hinglish: "Phir se book karein" },
   BOOK_SLOT: { en: "Book {{time}}", hi: "{{time}} बुक करें", hinglish: "{{time}} book karein" },
   PICK_NEW_TIME: { en: "Pick new time", hi: "नया समय चुनें", hinglish: "Naya time chunein" },

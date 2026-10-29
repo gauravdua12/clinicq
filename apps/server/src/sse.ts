@@ -8,7 +8,8 @@ export type BusEvent =
   | { type: "overflow.resolved"; id: string; status: string; by?: string }
   | { type: "doctor.status"; delayMin: number; pauseUntil: string | null }
   | { type: "callback.requested"; name: string; maskedPhone: string }
-  | { type: "system.alert"; kind: string; message: string };
+  | { type: "system.alert"; kind: string; message: string }
+  | { type: "payment.claimed"; id: string; name: string; amount: string };
 
 export class EventBus extends EventEmitter {
   publish(e: BusEvent): void { this.emit("event", e); }

@@ -10,6 +10,7 @@ import { affectedByClosure, applyClosure } from "../services/closures";
 import { audit, sendToAccount } from "../services/notify";
 import { createProfile, findOrCreateAccount, firstName } from "../services/patients";
 import * as Q from "../services/queue";
+import * as R from "../services/reminders";
 import { decideOverflow, walkinLink } from "../services/walkin";
 import { ClinicSettings } from "../settings";
 import { activateDemo, createDemo, deleteDemo, extractProfile, resetDemo, type ClinicProfile } from "../services/demo";
@@ -187,6 +188,49 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
     else await ctx.db.blockedSlot.deleteMany({ where: { doctorId: info.doctor.id, slotStart: at } });
     await audit(ctx, s.role, s.id, b.data.blocked ? "slot.block" : "slot.unblock", "BlockedSlot", null, { at: at.toISOString() });
     return { ok: true };
+  });
+
+  // ── follow-ups and payments due (any staff) ──
+  const VisitIn = z.object({ appointmentId: z.string().max(40).optional(), queueEntryId: z.string().max(40).optional() }).refine((v) => !!v.appointmentId !== !!v.queueEntryId);
+  const reminderErr = (reply: FastifyReply, e: unknown) => {
+    if (e instanceof R.ReminderError) return sendErr(reply, e.code === "not_found" ? 404 : 400, e.code);
+    throw e;
+  };
+  app.get("/api/followups", async (req, reply) => { if (!(await requireStaff(ctx, req, reply))) return; return R.listFollowUps(ctx); });
+  app.post("/api/followups", async (req, reply) => {
+    const s = await requireStaff(ctx, req, reply); if (!s) return;
+    const b = z.intersection(VisitIn, z.object({ dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })).safeParse(req.body);
+    if (!b.success) return sendErr(reply, 400, "bad_request");
+    try { return await R.createFollowUp(ctx, b.data, b.data.dueDate, s.id); } catch (e) { return reminderErr(reply, e); }
+  });
+  app.delete("/api/followups/:id", async (req, reply) => {
+    const s = await requireStaff(ctx, req, reply); if (!s) return;
+    try { await R.cancelFollowUp(ctx, (req.params as { id: string }).id, s.id); return { ok: true }; } catch (e) { return reminderErr(reply, e); }
+  });
+  app.get("/api/payments", async (req, reply) => {
+    if (!(await requireStaff(ctx, req, reply))) return;
+    return { upiConfigured: !!(await clinicInfo(ctx)).settings.paymentReminders.upiId, rows: await R.listPayments(ctx) };
+  });
+  app.post("/api/payments", async (req, reply) => {
+    const s = await requireStaff(ctx, req, reply); if (!s) return;
+    const b = z.intersection(VisitIn, z.object({ amount: z.number().positive().max(500_000) })).safeParse(req.body);
+    if (!b.success) return sendErr(reply, 400, "bad_request");
+    try { return await R.createPaymentDue(ctx, b.data, b.data.amount, s.id); } catch (e) { return reminderErr(reply, e); }
+  });
+  app.post("/api/payments/:id/:action", async (req, reply) => {
+    const s = await requireStaff(ctx, req, reply); if (!s) return;
+    const { id, action } = req.params as { id: string; action: string };
+    try {
+      if (action === "paid") return await R.markPaid(ctx, id, s.id);
+      if (action === "remind") return { whatsappSent: await R.sendPaymentReminder(ctx, id, true) };
+      if (action === "cancel") { await R.cancelPaymentDue(ctx, id, s.id); return { ok: true }; }
+      return sendErr(reply, 404, "not_found");
+    } catch (e) { return reminderErr(reply, e); }
+  });
+  // The patient's pay page (public; the unguessable token is the only key, and it shows no patient details).
+  app.get("/api/pay/:token", async (req, reply) => {
+    const r = await R.payPage(ctx, (req.params as { token: string }).token);
+    return r ?? sendErr(reply, 404, "not_found");
   });
 
   // ── settings (doctor only) ──

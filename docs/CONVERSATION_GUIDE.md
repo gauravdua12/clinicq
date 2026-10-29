@@ -152,6 +152,11 @@ IDLE ─DELETE_DATA▶ ERASE_CONFIRM ─▶ IDLE
 `reminder_same_day`: "Today at {{1}}: {{2}} ji's appointment (Token {{3}}). Doctor is {{4}}. Location: {{5}}"
 Replies: Confirm → "Thank you, see you tomorrow 😊". Reschedule/Cancel → those flows.
 
+**FOLLOWUP_DUE** (in the 24-hour window; else template `followup_due`): "Hello {{name}} ji, your follow-up visit with {{doctor}} is due on {{date}}. Would you like to book a time?" Button: [Book appointment] (`fu:<id>`) → that patient, visit type Follow-up, times from the due date (or today if it has passed). If the follow-up was cancelled or already booked: **FOLLOWUP_GONE** "That follow-up reminder is no longer active. Would you like to book a visit?"
+**PAYMENT_DUE** (cta_url; else template `payment_due`): "Hello {{name}} ji, a payment of ₹{{amount}} is pending for your visit to {{clinicName}} on {{date}}. You can pay at the clinic, or online with the button below." Button: [Pay now] → pay page.
+**PAYMENT_CLAIMED** (patient says "paid", "payment done", "pay kar diya", "भुगतान कर दिया" while an amount is pending; at most 10 words, no booking words): "Thank you{{nameJi}} 🙏 I've told the clinic you've paid ₹{{amount}}. They'll confirm once they see it." Reminders stop; staff see "says they've paid". Mid-booking, the pending question follows. With nothing pending, "paid" is handled like any other message.
+**PAYMENT_RECEIVED** (staff tap Mark paid; else template `payment_received`): "Thank you {{name}} ji 🙏 We've received your payment of ₹{{amount}} for your visit on {{date}}."
+
 ### 6.5 Arrival, queue status, alerts
 **ARRIVED_OK**: "Welcome, {{name}} ji 🙏 You're checked in. Token {{token}}, {{ahead}} ahead of you (about {{eta}} min)."
 **ARRIVED_EARLY**: "You're a little early, {{name}} ji 😊 Your time is {{time}}. I'll add you to the queue at {{autoCheckIn}}. Please have a seat."
