@@ -172,7 +172,8 @@ async function loadConv(ctx: Ctx, acc: PatientAccount): Promise<Conv> {
   if (row.expiresAt < ctx.clock.now()) {
     // Left unfinished for over 30 minutes: start from the beginning, and tell the patient (if they were mid-way).
     const midway = !["IDLE", "AWAIT_CONSENT", "AWAIT_NUMBER_CONFIRM"].includes(row.state);
-    return { ...fresh, lang: c.lang ?? acc.language, langLock: c.langLock, welcomeSent: c.welcomeSent, notice: midway ? "expired" : undefined };
+    // Someone who never agreed is still new: they get the full welcome again, never a "welcome back".
+    return { ...fresh, lang: c.lang ?? acc.language, langLock: c.langLock, notice: midway ? "expired" : undefined };
   }
   return { ...fresh, ...c, state: row.state as State };
 }
@@ -528,7 +529,8 @@ async function gates(t: Turn, e: Extraction | null, buttonId?: string): Promise<
     if (!agrees) {
       if (e) rememberPending(t, e);
       t.set("AWAIT_CONSENT");
-      if (!t.conv.welcomeSent) {
+      // A greeting before consent gets the welcome again: without consent this is still a new patient ("hello again" never).
+      if (!t.conv.welcomeSent || e?.intent === "GREETING") {
         t.conv.welcomeSent = true;
         await t.buttons(t.t("WELCOME_CONSENT"), "WELCOME_CONSENT", [{ id: "consent:yes", title: t.b("AGREE") }]);
       } else {

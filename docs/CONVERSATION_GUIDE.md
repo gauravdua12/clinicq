@@ -314,6 +314,8 @@ Rules now, for every state:
   word, it first says it didn't understand (`NOT_UNDERSTOOD`). Apologies, "take your time" and repeated menus rotate their wording.
 - **Answer what was said first, then ask again:** rude → `RUDE_REPLY` (apology, what I can do, clinic phone); help → `HELP_REPLY`;
   a clinic question → the answer; hello → `HELLO_AGAIN`. At the number question, the reason is given (`NUMBER_WHY`).
+- **Before consent everyone is a new patient:** a hello, or a message after the 30-minute window, gets `WELCOME_CONSENT` again;
+  no "hello again" or "welcome back" wording until the patient has agreed.
 - **"Hold on" keeps the place** (`WAIT_OK`, 30 minutes) and doesn't repeat the question.
 - **Two misses in a row** mid-way → `STUCK_HELP` with [Continue] [Menu] [Call clinic]. At the agreement or number question the
   second miss adds the clinic phone (`GATE_CALL_ALT`). "No" to the agreement → `CONSENT_DECLINED`.

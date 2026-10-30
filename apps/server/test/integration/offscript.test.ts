@@ -232,6 +232,23 @@ describe("queue messages agree with each other", () => {
 });
 
 describe("privacy questions and complaints", () => {
+  it("before consent nobody is greeted as a returning patient: a second hi, or coming back later, gets the welcome again", async () => {
+    const P = nextPhone();
+    const again = /welcome back|again|फिर से|वापसी|phir se/i;
+    await h.say(P, "Hi");
+    expect(await h.kinds(P)).toEqual(["WELCOME_CONSENT"]);
+    await h.say(P, "hello");
+    expect((await h.kinds(P)).slice(-1)).toEqual(["WELCOME_CONSENT"]);
+    await h.say(P, "book for tomorrow");
+    expect((await h.kinds(P)).at(-1)).toBe("CONSENT_REMINDER");
+    h.clock.advance(2 * 24 * 3600_000);
+    await h.say(P, "Hi");
+    expect((await h.kinds(P)).at(-1)).toBe("WELCOME_CONSENT");
+    for (const m of h.wa.sent.filter((x) => x.to === P)) expect(body(m.msg)).not.toMatch(again);
+    await h.tap(P, "consent:yes");
+    expect((await h.kinds(P)).at(-1)).toBe("CONFIRM_NUMBER");
+  });
+
   it("'privacy' and 'complaint' give the grievance officer, clinic contact and policy link, even before consent", async () => {
     const P = nextPhone();
     await h.say(P, "privacy");
