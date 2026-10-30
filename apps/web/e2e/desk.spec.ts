@@ -130,6 +130,20 @@ test("demo studio: create a demo, kit, switch back", async ({ page }) => {
   await expect(page.getByRole("row").filter({ hasText: "Dr. Sharma's Clinic" })).toContainText("Active");
 });
 
+test("Incolo admin adds a customer clinic from its own page", async ({ page }) => {
+  await loginAs(page);
+  await page.getByRole("link", { name: "Customer clinics" }).click();
+  await expect(page.getByRole("heading", { name: "Add a customer clinic" })).toBeVisible();
+  await page.getByLabel("Customer clinic's name").fill("Asha Eye Care");
+  await page.getByLabel("Doctor's name").fill("Dr. Asha Rao");
+  await page.getByLabel("Doctor's WhatsApp (for sign-in)").fill(`98${String(Date.now()).slice(-8)}`);
+  await page.getByLabel("Clinic phone (shown to patients)").fill("+91 80 4000 1234");
+  await page.getByLabel("Short address").fill("Jayanagar, Bengaluru");
+  await page.getByRole("button", { name: "Add customer clinic" }).click();
+  await expect(page.getByText(/Asha Eye Care added/)).toBeVisible();
+  await expect(page.locator(".rem-row").filter({ hasText: "Asha Eye Care" })).toContainText("Number not connected");
+});
+
 test("TV display follows the board live", async ({ page, browser }) => {
   await loginAs(page);
   const tv = await (await browser.newContext({ viewport: { width: 1600, height: 900 } })).newPage();

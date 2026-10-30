@@ -8,7 +8,10 @@ test("every page fits a phone screen and uses the bottom tab bar", async ({ page
   await loginAs(page);
   await expect(page.locator(".tabbar")).toBeVisible();
   await expect(page.locator(".rail")).toBeHidden();
-  for (const path of ["/", "/appointments", "/settings", "/reports", "/demo", "/login"]) {
+  // every page is a tab (Incolo admins also get Customer clinics and Demo Studio), and Log out is in the top bar
+  for (const name of ["Queue", "Bookings", "Reports", "Settings", "Clinics", "Demo"]) await expect(page.locator(".tabbar").getByRole("link", { name })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+  for (const path of ["/", "/appointments", "/settings", "/reports", "/clinics", "/demo", "/login"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     expect(await noHorizontalScroll(page), `${path} scrolls sideways`).toBe(true);

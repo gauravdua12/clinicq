@@ -23,8 +23,8 @@ export function CustomerClinics() {
   useEffect(() => { void load(); }, [load]);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => { setF({ ...f, [k]: e.target.value }); setMsg(null); };
   return (
-    <section className="card" style={{ marginTop: 16 }}>
-      <h2 style={{ marginTop: 0 }}>Customer clinics</h2>
+    <section className="card" style={{ maxWidth: 860 }}>
+      <h2 style={{ marginTop: 0 }}>Add a customer clinic</h2>
       <p className="small muted" style={{ marginTop: -4 }}>Clinics on their own WhatsApp number. After you add one, the doctor signs in at this site with their WhatsApp number, checks the hours, and connects the clinic&apos;s number in Settings → WhatsApp.</p>
       <form onSubmit={async (e) => {
         e.preventDefault();
