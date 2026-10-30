@@ -57,7 +57,7 @@ Uses **Embedded Signup**: the customer owns the WABA (in their own Meta portfoli
 4. Q-Incolo then, by itself: exchanges the code for the clinic's token (encrypted), checks the number, subscribes the account to our webhook, registers the number (two-step PIN kept encrypted), and submits all templates (EN + HI) for approval. Settings → WhatsApp shows display-name status, quality, messaging limit and template approvals (*Check status*, *Send missing templates*, *Disconnect*).
 5. The doctor adds a **payment method** in WhatsApp Manager. Utility messages cost about ₹0.145 each; replies within 24 hours are free.
 6. **Business verification** of the clinic raises the limit to 2,000 business-initiated messages a day. Until then the limit is 250 a day, which is enough for about 60 patients a day.
-- Until the number is connected, the doctor's login code comes from the shared Q-Incolo number; afterwards from the clinic's own number.
+- Until the number is connected, the doctor's login code comes from the shared Q-Incolo number; afterwards from the clinic's own number (or still from the shared number, when the doctor signs in with the clinic's own number).
 
 ## D. Numbers Incolo provides, pre-onboarded for speed
 Use this when the doctor doesn't want to use their own number, or wants to start the same day. There are two models:

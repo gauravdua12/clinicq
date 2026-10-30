@@ -86,9 +86,12 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> 
     await ctx.db.otpChallenge.upsert({ where: { phoneHash: staff.phoneHash }, create: { phoneHash: staff.phoneHash, codeHash: sha(code), expiresAt: new Date(ctx.clock.now().getTime() + 5 * 60_000) }, update: { codeHash: sha(code), attempts: 0, expiresAt: new Date(ctx.clock.now().getTime() + 5 * 60_000) } });
     if (rv && rv.wa === wa) return { ok: true };
     const to = decrypt(staff.waPhone);
-    // From the clinic's own number once it's connected; before that (or for demo clinics) from the shared number.
-    const conn = await ctx.db.waConnection.findUnique({ where: { clinicId: staff.clinicId }, select: { status: true } });
-    const sendScope = { clinicId: conn?.status === "CONNECTED" ? staff.clinicId : null };
+    // From the clinic's own number once it's connected; before that (or for demo clinics) from the shared number. A solo
+    // doctor often signs in with the clinic's own number, and a number can't message itself: that code comes from the
+    // shared number too.
+    const conn = await ctx.db.waConnection.findUnique({ where: { clinicId: staff.clinicId }, select: { status: true, displayPhone: true } });
+    const ownNumber = conn?.status === "CONNECTED" && normalizeIndianPhone(conn.displayPhone ?? "") !== wa;
+    const sendScope = { clinicId: ownNumber ? staff.clinicId : null };
     const sent = await inScope(sendScope, () => sendTo(ctx, to, { kind: "template", name: "staff_login_otp", lang: "en", bodyParams: [code], otpCode: code }, { kind: "staff_login_otp" }));
     // Until Meta approves the authentication template, a plain message still works if this person messaged the bot in the last 24 h.
     if (!sent) await inScope(sendScope, () => sendTo(ctx, to, { kind: "text", body: copy.render("STAFF_OTP_TEXT", "en", { code }) }, { kind: "staff_login_otp_text" }));

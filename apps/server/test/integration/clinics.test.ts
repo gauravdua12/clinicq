@@ -76,6 +76,17 @@ describe("a customer clinic on its own number", () => {
     expect(fromShared(P).length).toBe(sentBefore);
   });
 
+  it("the login code comes from the clinic's number, or from the shared one when the doctor signs in with the clinic's number", async () => {
+    await h.app.inject({ method: "POST", url: "/api/auth/otp", payload: { phone: "9876500011" } });
+    expect(fromB("919876500011")).toHaveLength(1);
+    expect(fromShared("919876500011")).toHaveLength(0);
+    await h.db.waConnection.update({ where: { clinicId: B.id }, data: { displayPhone: "+91 98765 00011" } });
+    h.clock.advance(5 * 60_000);
+    await h.app.inject({ method: "POST", url: "/api/auth/otp", payload: { phone: "9876500011" } });
+    expect(fromB("919876500011")).toHaveLength(1);
+    expect(fromShared("919876500011")).toHaveLength(1);
+  });
+
   it("its staff see only their clinic; another clinic's ids answer 404", async () => {
     // a booking at the demo clinic
     await onboard(h, P); await h.say(P, "book Monday morning for me"); await h.tap(P, "who:me"); await h.tap(P, h.buttons(P)[0]!.id); await h.tap(P, "vt:NEW"); await h.tap(P, "bk:yes");
