@@ -192,7 +192,8 @@ const STAFF_ERR: Record<string, string> = {
   own_login: "You can't deactivate or demote your own login.",
   incolo_admin: "This is an Incolo admin login. It can't be deactivated or demoted here.",
   last_doctor: "This is the clinic's only active doctor login. Add or activate another doctor first.",
-  phone_in_use: "This WhatsApp number already signs in to another clinic.",
+  not_found: "This login is no longer here. Refresh the page.",
+  phone_in_use: "This WhatsApp number still signs in to another clinic. Ask that clinic to deactivate it in Settings → Staff, then add it here.",
 };
 
 function StaffTab() {
@@ -213,7 +214,13 @@ function StaffTab() {
               try { await api(`/api/settings/staff/${r.id}`, { method: "PATCH", body: { active: !r.active } }); s.ok(r.active ? `${r.name} deactivated` : `${r.name} activated`); }
               catch (e) { s.err((e instanceof ApiError && STAFF_ERR[e.code]) || "Couldn't change this login. Try again."); }
               void load();
-            }}>{r.active ? "Deactivate" : "Activate"}</button>}</td>
+            }}>{r.active ? "Deactivate" : "Activate"}</button>}
+              {!(r.you || r.incoloAdmin) && <button className="ghost small warn" style={{ marginLeft: 6 }} onClick={async () => {
+                if (!confirm(`Remove ${r.name} permanently? Their login is deleted and they can't sign in. To give them access again, add them as new staff.`)) return;
+                try { await api(`/api/settings/staff/${r.id}`, { method: "DELETE" }); s.ok(`${r.name} removed`); }
+                catch (e) { s.err((e instanceof ApiError && STAFF_ERR[e.code]) || "Couldn't remove this login. Try again."); }
+                void load();
+              }}>Remove</button>}</td>
           </tr>
         ))}</tbody></table>
       <h2 style={{ marginTop: 16 }}>Add staff</h2>
@@ -221,7 +228,7 @@ function StaffTab() {
         <input style={{ flex: 2 }} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
         <input style={{ flex: 2 }} placeholder="WhatsApp number" value={phone} onChange={(e) => setPhone(e.target.value)} />
         <select style={{ flex: 1 }} value={role} onChange={(e) => setRole(e.target.value)}><option value="STAFF">Staff</option><option value="DOCTOR">Doctor (admin)</option></select>
-        <button className="primary" onClick={async () => { try { await api("/api/settings/staff", { body: { name, phone, role } }); setName(""); setPhone(""); s.ok("Added"); void load(); } catch (e) { s.err((e instanceof ApiError && STAFF_ERR[e.code]) || "Check the name and 10-digit number."); } }}>Add</button>
+        <button className="primary" onClick={async () => { try { const r = await api<{ moved?: boolean }>("/api/settings/staff", { body: { name, phone, role } }); setName(""); setPhone(""); s.ok(r.moved ? "Added. Their login moved here from their previous clinic" : "Added"); void load(); } catch (e) { s.err((e instanceof ApiError && STAFF_ERR[e.code]) || "Check the name and 10-digit number."); } }}>Add</button>
       </div>
       {s.state.ok && <div className="ok">{s.state.ok}</div>}{s.state.err && <div className="err">{s.state.err}</div>}
     </div>

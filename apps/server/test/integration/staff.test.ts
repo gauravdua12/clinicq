@@ -68,4 +68,61 @@ describe("Settings → Staff protects the logins a clinic can't do without", () 
     expect(code(await add(sid, { name: "Hijack", phone: "9876500011", role: "STAFF" }))).toBe("phone_in_use");
     expect(await h.db.staffUser.findUniqueOrThrow({ where: { phoneHash: phoneHash("919876500011") } })).toMatchObject({ name: "Dr. Mehta", role: "DOCTOR" });
   });
+
+  it("someone changing clinics: once the old clinic deactivates them, the new clinic adds them and they move over", async () => {
+    const { id: sunrise } = await createCustomerClinic(h.ctx, { clinicName: "Sunrise Child Clinic", doctorName: "Dr. Mehta", doctorPhone: "9876500011", addressShort: "Baner, Pune", clinicPhone: "+91 20 4000 5555" }, null);
+    const sharma = await login(SEED.doctorPhone);
+    const priyaSid = await login(SEED.staffPhone);
+    expect(code(await add(sharma, { name: "Dr. Mehta", phone: "9876500011", role: "STAFF" }))).toBe("phone_in_use"); // still active at Sunrise
+    // Priya leaves Dr. Sharma's clinic and joins Sunrise.
+    expect((await patch(sharma, await idOf(SEED.staffPhone), { active: false })).statusCode).toBe(200);
+    const mehta = await login("919876500011");
+    const r = await h.app.inject({ method: "POST", url: "/api/settings/staff", cookies: { sid: mehta }, payload: { name: "Priya R", phone: SEED.staffPhone.slice(2), role: "STAFF" } });
+    expect(r.json()).toMatchObject({ moved: true });
+    expect(await h.db.staffUser.findUniqueOrThrow({ where: { phoneHash: phoneHash(SEED.staffPhone) } })).toMatchObject({ clinicId: sunrise, name: "Priya R", role: "STAFF", active: true });
+    expect(await h.db.staffSession.count({ where: { staffId: await idOf(SEED.staffPhone) } })).toBe(0); // her old sign-in doesn't carry over
+    expect((await h.app.inject({ method: "GET", url: "/api/me", cookies: { sid: priyaSid } })).statusCode).toBe(401);
+    // She's gone from the old clinic's list, and the old clinic can't pull her back.
+    const old = (await h.app.inject({ method: "GET", url: "/api/settings/staff", cookies: { sid: sharma } })).json() as { name: string }[];
+    expect(old.map((x) => x.name)).not.toContain("Priya R");
+    expect(code(await add(sharma, { name: "Priya", phone: SEED.staffPhone.slice(2), role: "STAFF" }))).toBe("phone_in_use");
+  });
+
+  it("Incolo's own logins never move to a clinic, even when switched off", async () => {
+    await h.db.staffUser.create({ data: { clinicId: await clinicId(), name: "Demo presenter", waPhone: encrypt(ADMIN), phoneHash: phoneHash(ADMIN), role: "DOCTOR", active: false } });
+    await expect(createCustomerClinic(h.ctx, { clinicName: "Sunrise Child Clinic", doctorName: "Dr. Mehta", doctorPhone: "9920323832", addressShort: "Baner, Pune", clinicPhone: "+91 20 4000 5555" }, null)).rejects.toThrow("phone_in_use");
+  });
+
+  it("a doctor whose old clinic released their number can get a clinic of their own", async () => {
+    const other = "919811100777";
+    await h.db.staffUser.create({ data: { clinicId: await clinicId(), name: "Dr. Mehta", waPhone: encrypt(other), phoneHash: phoneHash(other), role: "STAFF" } });
+    await expect(createCustomerClinic(h.ctx, { clinicName: "Sunrise Child Clinic", doctorName: "Dr. Mehta", doctorPhone: "9811100777", addressShort: "Baner, Pune", clinicPhone: "+91 20 4000 5555" }, null)).rejects.toThrow("phone_in_use");
+    await h.db.staffUser.update({ where: { phoneHash: phoneHash(other) }, data: { active: false } });
+    const { id } = await createCustomerClinic(h.ctx, { clinicName: "Sunrise Child Clinic", doctorName: "Dr. Mehta", doctorPhone: "9811100777", addressShort: "Baner, Pune", clinicPhone: "+91 20 4000 5555" }, null);
+    expect(await h.db.staffUser.findUniqueOrThrow({ where: { phoneHash: phoneHash(other) } })).toMatchObject({ clinicId: id, role: "DOCTOR", active: true });
+  });
+
+  it("Remove deletes a login for good, frees the number, and never removes a protected login", async () => {
+    await h.db.staffUser.create({ data: { clinicId: await clinicId(), name: "Demo presenter", waPhone: encrypt(ADMIN), phoneHash: phoneHash(ADMIN), role: "DOCTOR" } });
+    const sharma = await login(SEED.doctorPhone);
+    const priya = await idOf(SEED.staffPhone);
+    const priyaSid = await login(SEED.staffPhone);
+    const del = (sid: string, id: string) => h.app.inject({ method: "DELETE", url: `/api/settings/staff/${id}`, cookies: { sid } });
+    expect(code(await del(sharma, await idOf(SEED.doctorPhone)))).toBe("own_login");
+    expect(code(await del(sharma, await idOf(ADMIN)))).toBe("incolo_admin");
+    expect((await del(sharma, priya)).statusCode).toBe(200);
+    expect(await h.db.staffUser.findUnique({ where: { id: priya } })).toBeNull();
+    expect(await h.db.staffSession.count({ where: { staffId: priya } })).toBe(0);
+    expect((await h.app.inject({ method: "GET", url: "/api/me", cookies: { sid: priyaSid } })).statusCode).toBe(401);
+    expect(await h.db.auditLog.count({ where: { action: "staff.remove", entityId: priya } })).toBe(1);
+    // The number is free: another clinic can add her as new staff.
+    const { id: sunrise } = await createCustomerClinic(h.ctx, { clinicName: "Sunrise Child Clinic", doctorName: "Dr. Mehta", doctorPhone: "9876500011", addressShort: "Baner, Pune", clinicPhone: "+91 20 4000 5555" }, null);
+    const r = await h.app.inject({ method: "POST", url: "/api/settings/staff", cookies: { sid: await login("919876500011") }, payload: { name: "Priya", phone: SEED.staffPhone.slice(2), role: "STAFF" } });
+    expect(r.statusCode).toBe(200);
+    expect(await h.db.staffUser.findUniqueOrThrow({ where: { phoneHash: phoneHash(SEED.staffPhone) } })).toMatchObject({ clinicId: sunrise, active: true });
+    // A clinic can't remove another clinic's login, and the last active doctor stays (the same rule as Deactivate).
+    expect((await del(sharma, await idOf("919876500011"))).statusCode).toBe(404);
+    const iyer = await login("919876500011");
+    expect(code(await del(iyer, await idOf("919876500011")))).toBe("own_login");
+  });
 });

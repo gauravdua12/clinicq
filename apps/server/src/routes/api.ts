@@ -13,6 +13,7 @@ import * as Q from "../services/queue";
 import * as R from "../services/reminders";
 import { clinicWaNumber } from "../services/whatsapp";
 import { createCustomerClinic, CustomerError, listCustomerClinics } from "../services/customers";
+import { isIncoloLogin, moveReleasedLogin } from "../services/staff";
 import * as ES from "../services/embeddedSignup";
 import { decideOverflow, walkinLink } from "../services/walkin";
 import { ClinicSettings } from "../settings";
@@ -348,7 +349,11 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
     if (!b.success || !wa) return sendErr(reply, 400, "bad_request");
     const info = await clinicInfo(ctx);
     const existing = await ctx.db.staffUser.findUnique({ where: { phoneHash: phoneHash(wa) } });
-    if (existing && existing.clinicId !== info.clinic.id) return sendErr(reply, 409, "phone_in_use"); // another clinic's login: never touched from here
+    if (existing && existing.clinicId !== info.clinic.id) { // another clinic's login: moves here only once that clinic has released it
+      if (!(await moveReleasedLogin(ctx, existing, wa, info.clinic.id, { name: b.data.name, role: b.data.role }))) return sendErr(reply, 409, "phone_in_use");
+      await audit(ctx, "DOCTOR", s.id, "staff.move_in", "StaffUser", existing.id);
+      return { id: existing.id, moved: true };
+    }
     const refused = existing && (await staffChangeRefused(ctx, s, existing, { role: b.data.role }));
     if (refused) return sendErr(reply, 409, refused);
     const u = await ctx.db.staffUser.upsert({ where: { phoneHash: phoneHash(wa) }, create: { clinicId: info.clinic.id, name: b.data.name, waPhone: encrypt(wa), phoneHash: phoneHash(wa), role: b.data.role }, update: { name: b.data.name, role: b.data.role, active: true } });
@@ -365,6 +370,21 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
     if (refused) return sendErr(reply, 409, refused);
     await ctx.db.staffUser.update({ where: { id: target.id }, data: b.data });
     await audit(ctx, "DOCTOR", s.id, "staff.update", "StaffUser", (req.params as { id: string }).id, b.data);
+    return { ok: true };
+  });
+  // Remove: the login is deleted for good (sign-ins and any pending login code too), which also frees the number for
+  // another clinic. The same logins are protected as for Deactivate; Incolo's own logins are never removed.
+  app.delete("/api/settings/staff/:id", async (req, reply) => {
+    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
+    const info = await clinicInfo(ctx);
+    const target = await ctx.db.staffUser.findUnique({ where: { id: (req.params as { id: string }).id } });
+    if (!target || target.clinicId !== info.clinic.id) return sendErr(reply, 404, "not_found");
+    const refused = target.id === s.id ? "own_login" : isIncoloLogin(ctx, decrypt(target.waPhone)) ? "incolo_admin" : await staffChangeRefused(ctx, s, target, { active: false });
+    if (refused) return sendErr(reply, 409, refused);
+    await ctx.db.staffSession.deleteMany({ where: { staffId: target.id } });
+    await ctx.db.otpChallenge.deleteMany({ where: { phoneHash: target.phoneHash } });
+    await ctx.db.staffUser.deleteMany({ where: { id: target.id, clinicId: info.clinic.id } });
+    await audit(ctx, "DOCTOR", s.id, "staff.remove", "StaffUser", target.id);
     return { ok: true };
   });
   app.get("/api/settings/qr", async (req, reply) => {

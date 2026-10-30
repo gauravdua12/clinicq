@@ -9,7 +9,7 @@ import { api, ApiError } from "./api";
 interface Row { id: string; name: string; doctor: string; doctorPhone: string; createdAt: string; whatsapp: { status: string; displayPhone: string | null; verifiedName: string | null } | null }
 
 const ERR: Record<string, string> = {
-  phone_in_use: "That WhatsApp number already signs in to a clinic on Q-Incolo.",
+  phone_in_use: "That WhatsApp number still signs in to a clinic on Q-Incolo. That clinic deactivates it first (Settings → Staff), then add the clinic again.",
   bad_phone: "Enter the doctor's 10-digit mobile number.",
   bad_request: "Fill in every field.",
 };

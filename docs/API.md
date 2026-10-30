@@ -65,7 +65,7 @@ Base: `PUBLIC_BASE_URL`. JSON everywhere. Auth means an httpOnly `sid` cookie (S
 
 ## Customer clinics (Incolo admins)
 - `GET /api/admin/clinics` → `[{id, name, doctor, doctorPhone (masked), createdAt, whatsapp: {status, displayPhone, verifiedName} | null}]`.
-- `POST /api/admin/clinics {clinicName, doctorName, doctorPhone, addressShort, clinicPhone}` → `{id, code}`. Errors: `bad_phone`, `phone_in_use`.
+- `POST /api/admin/clinics {clinicName, doctorName, doctorPhone, addressShort, clinicPhone}` → `{id, code}`. Errors: `bad_phone`, `phone_in_use` (the doctor's number is still active at another clinic; one that clinic deactivated moves to the new clinic).
 
 ## Settings (role: DOCTOR)
 | Method | Path | Purpose |
@@ -73,7 +73,7 @@ Base: `PUBLIC_BASE_URL`. JSON everywhere. Auth means an httpOnly `sid` cookie (S
 | GET/PUT | `/api/settings/clinic` | Clinic profile + ClinicSettings (zod-validated) |
 | GET/PUT | `/api/settings/sessions` | weekly sessions |
 | GET/POST/DELETE | `/api/settings/closures` | POST returns `{affectedAppointments}`, then `?confirm=1` applies + notifies |
-| GET/POST/PATCH | `/api/settings/staff` | add, deactivate, toggle on duty. Refused with 409: your own login (`own_login`), an Incolo admin's (`incolo_admin`), the clinic's last active doctor (`last_doctor`) can't be deactivated or demoted; a number that signs in to another clinic (`phone_in_use`) is never changed |
+| GET/POST/PATCH/DELETE | `/api/settings/staff` | add, deactivate, toggle on duty; `DELETE /:id` removes a login permanently (its sign-ins and pending code too, and frees the number). Deactivate and remove are refused with 409: your own login (`own_login`), an Incolo admin's (`incolo_admin`), the clinic's last active doctor (`last_doctor`) can't be deactivated, removed or demoted; a number still active at another clinic (`phone_in_use`) is never changed. Someone changing clinics: once the old clinic deactivates them, adding their number here moves that login over (`{id, moved: true}`), signed out everywhere; Incolo's own logins (admins, presenters, App Review) never move |
 | GET | `/api/settings/qr` | today's walk-in QR (PNG) |
 | GET | `/api/settings/display-key` / POST rotate | |
 

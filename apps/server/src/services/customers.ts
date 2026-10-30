@@ -4,6 +4,7 @@ import type { Ctx } from "../context";
 import { invalidateClinicCache } from "./clinic";
 import { uniqueCode } from "./demo";
 import { audit } from "./notify";
+import { isIncoloLogin, moveReleasedLogin } from "./staff";
 
 // Customer clinics (docs/META_ONBOARDING.md §C): a clinic on its own WhatsApp number. Incolo creates it with the
 // doctor's WhatsApp number; the doctor signs in, sets up hours, and connects the clinic's number (Embedded Signup).
@@ -17,7 +18,9 @@ export interface CustomerInput { clinicName: string; doctorName: string; doctorP
 export async function createCustomerClinic(ctx: Ctx, input: CustomerInput, actorId: string | null): Promise<{ id: string; code: string }> {
   const wa = normalizeIndianPhone(input.doctorPhone);
   if (!wa) throw new CustomerError("bad_phone");
-  if (await ctx.db.staffUser.findUnique({ where: { phoneHash: phoneHash(wa) } })) throw new CustomerError("phone_in_use");
+  // A doctor whose number another clinic has released (deactivated) brings that login over; an active one never moves.
+  const existing = await ctx.db.staffUser.findUnique({ where: { phoneHash: phoneHash(wa) } });
+  if (existing && (existing.active || isIncoloLogin(ctx, wa))) throw new CustomerError("phone_in_use");
   const clinic = await ctx.db.clinic.create({
     data: {
       name: input.clinicName, addressShort: input.addressShort, addressFull: input.addressShort, phone: input.clinicPhone,
@@ -32,7 +35,8 @@ export async function createCustomerClinic(ctx: Ctx, input: CustomerInput, actor
     await ctx.db.session.create({ data: { doctorId: doctor.id, weekday: wd, label: "Morning", startTime: "10:00", endTime: "13:00", slotMinutes: 15, walkinQuota: 10 } });
     await ctx.db.session.create({ data: { doctorId: doctor.id, weekday: wd, label: "Evening", startTime: "17:00", endTime: "20:00", slotMinutes: 15, walkinQuota: 10 } });
   }
-  await ctx.db.staffUser.create({ data: { clinicId: clinic.id, name: input.doctorName, waPhone: encrypt(wa), phoneHash: phoneHash(wa), role: "DOCTOR" } });
+  if (existing) await moveReleasedLogin(ctx, existing, wa, clinic.id, { name: input.doctorName, role: "DOCTOR" });
+  else await ctx.db.staffUser.create({ data: { clinicId: clinic.id, name: input.doctorName, waPhone: encrypt(wa), phoneHash: phoneHash(wa), role: "DOCTOR" } });
   invalidateClinicCache();
   await audit(ctx, "OPERATOR", actorId, "customer.create", "Clinic", clinic.id, { name: clinic.name });
   return { id: clinic.id, code: clinic.code };

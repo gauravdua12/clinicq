@@ -110,6 +110,27 @@ test("settings: save clinic, sessions overlap error, model switch", async ({ pag
   await expect(page.getByText(/Saved\./)).toBeVisible({ timeout: 15_000 });
 });
 
+test("settings → staff: your own row can't be switched off; add, deactivate and remove staff", async ({ page }) => {
+  await loginAs(page);
+  await page.getByRole("link", { name: "Settings" }).first().click();
+  await page.getByRole("button", { name: "Staff", exact: true }).click();
+  const me = page.locator("tr").filter({ hasText: "You" });
+  await expect(me).toBeVisible();
+  await expect(me.getByRole("button")).toHaveCount(0);
+  await page.getByPlaceholder("Name").fill("Kiran Temp");
+  await page.getByPlaceholder("WhatsApp number").fill("9811122233");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  const row = page.locator("tr").filter({ hasText: "Kiran Temp" });
+  await expect(row).toBeVisible();
+  page.once("dialog", (d) => d.accept());
+  await row.getByRole("button", { name: "Deactivate" }).click();
+  await expect(page.getByText("Kiran Temp deactivated")).toBeVisible();
+  page.once("dialog", (d) => { expect(d.message()).toContain("permanently"); void d.accept(); });
+  await row.getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByText("Kiran Temp removed")).toBeVisible();
+  await expect(row).toHaveCount(0);
+});
+
 test("demo studio: create a demo, kit, switch back", async ({ page }) => {
   await loginAs(page);
   await page.getByRole("link", { name: "Demo Studio" }).click();
