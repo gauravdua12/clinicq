@@ -92,7 +92,7 @@ export function WhatsAppTab() {
   if (!d.ownNumber) return <div className="card"><p className="muted" style={{ margin: 0 }}>This clinic runs on the Q-Incolo demo number. Customer clinics connect their own WhatsApp number here.</p></div>;
 
   const c = d.connection;
-  const h = c?.health;
+  const h = c?.health?.templates ? c.health : null; // a just-made connection has no status from Meta yet
   return (
     <div className="card" style={{ maxWidth: 680 }}>
       {msg && <div className={msg.ok ? "ok" : "err"} role="status" style={{ marginBottom: 12 }}>{msg.text}</div>}

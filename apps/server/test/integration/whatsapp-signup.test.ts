@@ -68,6 +68,7 @@ describe("connecting a customer clinic's own WhatsApp number", () => {
     expect(r.statusCode).toBe(200);
     expect(r.json()).toMatchObject({ connection: { displayPhone: "+91 98111 22333", verifiedName: "Sunrise Child Clinic", connectedBy: "Anil Mehta" }, problems: [] });
     expect(JSON.stringify(r.json())).not.toContain("EAAclinic"); // the token never goes back to the browser
+    expect(r.json().connection.health).toBeNull(); // no status from Meta yet: the page shows "checking", never half a status
 
     const ex = calls.find((c) => c.path === "oauth/access_token")!;
     expect(ex.query).toMatchObject({ client_id: "2655971144875702", code: "AQD-one-time-code-123" });
@@ -82,6 +83,8 @@ describe("connecting a customer clinic's own WhatsApp number", () => {
     const posted = calls.filter((c) => c.path === `${WABA}/message_templates` && c.method === "POST");
     const expected = Object.keys(TEMPLATES).length * 2 - 1 /* auth: English only */ - 1 /* booking_confirmation/en exists */;
     expect(posted).toHaveLength(expected);
+    // the status check runs straight after the templates go in
+    expect(((await api(sid, "GET", "/api/whatsapp")).json() as { connection: { health: { templates: { approved: number } } } }).connection.health.templates).toBeTruthy();
     const pay = posted.find((c) => c.body?.name === "payment_due" && c.body.language === "en")!;
     expect(JSON.stringify(pay.body)).toContain("/pay?t={{1}}");
 

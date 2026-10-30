@@ -395,12 +395,14 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
   app.get("/api/settings/display-key", async (req, reply) => { if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return; return { key: (await clinicInfo(ctx)).clinic.displayKey }; });
 
   // ── The clinic's own WhatsApp number (customer clinics; doctor only) ──
+  // Until the first status check with Meta, a connection only knows its set-up problems: the page shows "checking".
+  const fullHealth = (h: unknown) => (h && typeof h === "object" && "templates" in h && (h as { templates?: unknown }).templates ? h : null);
   const waView = async () => {
     const info = await clinicInfo(ctx);
     const c = await ctx.db.waConnection.findUnique({ where: { clinicId: info.clinic.id } });
     return {
       ownNumber: info.clinic.ownNumber, signup: ES.signupConfig(ctx),
-      connection: c && c.status === "CONNECTED" ? { displayPhone: c.displayPhone, verifiedName: c.verifiedName, connectedBy: c.connectedBy, connectedAt: c.connectedAt.toISOString(), checkedAt: c.checkedAt?.toISOString() ?? null, health: c.health } : null,
+      connection: c && c.status === "CONNECTED" ? { displayPhone: c.displayPhone, verifiedName: c.verifiedName, connectedBy: c.connectedBy, connectedAt: c.connectedAt.toISOString(), checkedAt: c.checkedAt?.toISOString() ?? null, health: fullHealth(c.health) } : null,
     };
   };
   const signupErr = (reply: FastifyReply, e: unknown) => {

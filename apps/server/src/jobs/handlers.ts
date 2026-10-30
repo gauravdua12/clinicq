@@ -43,6 +43,7 @@ export function registerJobs(ctx: Ctx): void {
   j.on("waTemplates", async () => {
     const r = await submitTemplates(ctx);
     ctx.log.info({ created: r.created, failed: r.failed.length }, "wa_templates_submitted");
+    await checkConnection(ctx).catch((e) => ctx.log.warn({ err: e }, "wa_check_failed")); // the Settings page's status, right away
     const now = ctx.clock.now().getTime();
     for (const min of [10, 60, 24 * 60]) await j.schedule("waCheck", {}, new Date(now + min * 60_000), `wa-check:${currentScope().clinicId}:${min}`);
   });
