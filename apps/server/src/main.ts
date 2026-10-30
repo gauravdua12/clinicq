@@ -8,6 +8,7 @@ process.on("unhandledRejection", (reason) => { console.error(JSON.stringify({ le
 process.on("uncaughtException", (err) => { console.error(JSON.stringify({ level: 60, msg: "uncaught_exception", err: err.name })); process.exit(1); }); // systemd restarts us
 const { app, ctx } = await buildApp({ env });
 await (await import("./routes/auth")).ensureReviewer(ctx).catch((e) => ctx.log.error({ err: e }, "reviewer_setup_failed"));
+await (await import("./services/admins")).ensureAdmins(ctx).catch((e) => ctx.log.error({ err: e }, "admins_failed"));
 if (env.DEMO_STUDIO) await (await import("./services/demo")).ensurePresenters(ctx).catch((e) => ctx.log.error({ err: e }, "presenters_failed"));
 ctx.jobs.start(env.JOB_POLL_MS);
 await app.listen({ port: env.PORT, host: env.HOST });

@@ -40,8 +40,13 @@ const ERR: Record<string, string> = {
   not_configured: "WhatsApp sign-up isn't set up on this server yet. Please contact Incolo.",
   not_customer_clinic: "This clinic runs on the Q-Incolo demo number, so there is nothing to connect.",
 };
-const QUALITY: Record<string, string> = { GREEN: "High", YELLOW: "Medium", RED: "Low" };
-const LIMIT: Record<string, string> = { TIER_250: "250 a day", TIER_1K: "1,000 a day", TIER_10K: "10,000 a day", TIER_100K: "100,000 a day", TIER_UNLIMITED: "Unlimited" };
+const QUALITY: Record<string, string> = { GREEN: "High", YELLOW: "Medium", RED: "Low", UNKNOWN: "Not rated yet (new number)" };
+const LIMIT: Record<string, string> = { TIER_250: "250 people a day", TIER_1K: "1,000 people a day", TIER_10K: "10,000 people a day", TIER_100K: "100,000 people a day", TIER_UNLIMITED: "No limit" };
+// Meta's display-name review status, in plain words.
+const NAME: Record<string, string> = {
+  APPROVED: "Approved", AVAILABLE_WITHOUT_REVIEW: "Usable now (Meta hasn't reviewed it yet)", PENDING_REVIEW: "Waiting for Meta's review",
+  DECLINED: "Not approved by Meta: change it in WhatsApp Manager", EXPIRED: "Expired: set it again in WhatsApp Manager", NONE: "Not set",
+};
 
 export function WhatsAppTab() {
   const [d, setD] = useState<WaView | null>(null);
@@ -117,12 +122,13 @@ export function WhatsAppTab() {
           <p style={{ marginTop: 0 }}><b>{c.displayPhone}</b> · connected {new Date(c.connectedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}{c.connectedBy ? ` by ${c.connectedBy}` : ""}</p>
           {h ? (
             <dl className="wa-health">
-              <dt>Display name</dt><dd>{h.phone?.nameStatus === "APPROVED" ? "Approved" : h.phone?.nameStatus ? `${h.phone.nameStatus.replace(/_/g, " ").toLowerCase()}` : "—"}</dd>
+              <dt>Display name</dt><dd>{h.phone?.nameStatus ? NAME[h.phone.nameStatus] ?? h.phone.nameStatus.replace(/_/g, " ").toLowerCase() : "—"}</dd>
               <dt>Quality</dt><dd>{(h.phone?.quality && QUALITY[h.phone.quality]) ?? "—"}</dd>
-              <dt>Messages you can start</dt><dd>{(h.phone?.limit && LIMIT[h.phone.limit]) ?? "—"}</dd>
-              <dt>Message templates</dt><dd>{h.templates.approved} approved{h.templates.pending ? ` · ${h.templates.pending} waiting` : ""}{h.templates.rejected ? ` · ${h.templates.rejected} rejected` : ""}{h.templates.missing ? ` · ${h.templates.missing} not sent yet` : ""}</dd>
+              <dt>New conversations you can start</dt><dd>{(h.phone?.limit && LIMIT[h.phone.limit]) ?? "—"}</dd>
+              <dt>Message templates</dt><dd>{h.templates.approved} approved{h.templates.pending ? ` · ${h.templates.pending} waiting for Meta's approval` : ""}{h.templates.rejected ? ` · ${h.templates.rejected} rejected` : ""}{h.templates.missing ? ` · ${h.templates.missing} not sent yet` : ""}</dd>
             </dl>
           ) : <p className="small muted">Checking the number and templates with Meta…</p>}
+          {h && <p className="small muted" style={{ marginTop: 0 }}>Replies to a patient within 24 hours of their message always work and don&apos;t count towards the limit. Reminders and confirmations that Q-Incolo starts itself use the message templates, once Meta approves them (usually minutes, at most a day). Meta raises the limit on its own as the number is used well.</p>}
           {!!h?.problems?.length && <div className="err small">{h.problems.join("; ")}</div>}
           <p className="small muted">To send reminders and confirmations, add a payment method for your WhatsApp account in <a href="https://business.facebook.com/wa/manage/home/" target="_blank" rel="noreferrer">WhatsApp Manager</a>. Meta bills your business directly; replies to patients within 24 hours are free.</p>
           <div className="row">

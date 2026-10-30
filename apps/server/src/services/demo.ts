@@ -7,6 +7,7 @@ import type { Ctx } from "../context";
 import { clinicInfo, invalidateClinicCache } from "./clinic";
 import { DEMO_CHANNEL } from "../scope";
 import { audit } from "./notify";
+import { adminPhones } from "./admins";
 
 // Demo Studio: spin up a convincing demo clinic for a prospect from a name, website or brochure text.
 // Uses PUBLIC business information only. Real onboarding is a separate, fuller process (docs/ONBOARDING.md).
@@ -201,7 +202,8 @@ async function demoNumberClinic(ctx: Ctx, clinicId: string): Promise<void> {
 export async function activateDemo(ctx: Ctx, clinicId: string, actorId: string | null): Promise<void> {
   await demoNumberClinic(ctx, clinicId);
   await ctx.db.systemConfig.upsert({ where: { key: "activeClinicId" }, create: { key: "activeClinicId", value: clinicId as never, updatedBy: actorId }, update: { value: clinicId as never, updatedBy: actorId } });
-  for (const wa of presenterPhones()) {
+  // Presenters and Incolo admins run the active demo clinic (an admin's login lives in the shared-number clinic).
+  for (const wa of new Set([...presenterPhones(), ...(await adminPhones(ctx))])) {
     await ctx.db.staffUser.upsert({
       where: { phoneHash: phoneHash(wa) },
       create: { clinicId, name: "Demo presenter", waPhone: encrypt(wa), phoneHash: phoneHash(wa), role: "DOCTOR" },

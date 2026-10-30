@@ -8,10 +8,22 @@ test("every page fits a phone screen and uses the bottom tab bar", async ({ page
   await loginAs(page);
   await expect(page.locator(".tabbar")).toBeVisible();
   await expect(page.locator(".rail")).toBeHidden();
-  // every page is a tab (Incolo admins also get Customer clinics and Demo Studio), and Log out is in the top bar
-  for (const name of ["Queue", "Bookings", "Reports", "Settings", "Clinics", "Demo"]) await expect(page.locator(".tabbar").getByRole("link", { name })).toBeVisible();
+  // every page of a clinic's portal is a tab, and Log out is in the top bar
+  for (const name of ["Queue", "Appointments", "Reports", "Settings"]) await expect(page.locator(".tabbar").getByRole("link", { name })).toBeVisible();
+  await expect(page.locator(".tabbar a")).toHaveCount(4);
   await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
-  for (const path of ["/", "/appointments", "/settings", "/reports", "/clinics", "/demo", "/login"]) {
+  for (const path of ["/", "/appointments", "/settings", "/reports", "/login"]) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+    expect(await noHorizontalScroll(page), `${path} scrolls sideways`).toBe(true);
+  }
+});
+
+test("the admin portal fits a phone too", async ({ page }) => {
+  await loginAs(page, "Incolo admin");
+  for (const name of ["Clinics", "Demos", "Model", "Admins", "Demo clinic"]) await expect(page.locator(".tabbar").getByRole("link", { name, exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+  for (const path of ["/admin", "/admin/demo", "/admin/model", "/admin/admins"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     expect(await noHorizontalScroll(page), `${path} scrolls sideways`).toBe(true);

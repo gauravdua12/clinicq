@@ -3,7 +3,7 @@
 **Decision: primary `bedrock-mantle:qwen.qwen3-32b` → failover `bedrock-mantle:mistral.mistral-large-3-675b-instruct`.**
 Voice notes: `voxtral-small` (Mistral Voxtral Small 24B), with `voxtral-mini` as fallback.
 All of these are open-weight models running in **AWS Mumbai (ap-south-1)** through the Bedrock "Mantle" OpenAI-compatible endpoint, so data stays in India.
-The admin can switch any of these in **Settings → Language model** without a redeploy. Each change must pass a 12-message live smoke test, including every safety case, before it is saved.
+An Incolo admin can switch any of these in the **admin portal → Language model** without a redeploy. Each change must pass a 12-message live smoke test, including every safety case, before it is saved.
 
 ## Method
 - **Test set:** 140 dev cases plus **70 held-out cases** that were never used for tuning (`packages/ai/eval/{cases,holdout}.ts`). They cover booking, answers within a conversation, manage and status requests, clinic info, privacy commands, **health details** (must be flagged and never stored), **emergencies** (must be flagged), controls (no false flags), Devanagari Hindi, and noisy, voice-like text.

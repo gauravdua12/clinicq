@@ -107,6 +107,19 @@ label { display: block; font-size: 13px; font-weight: 600; color: var(--slate); 
 .rail a.nav:hover { background: var(--card-2); text-decoration: none; }
 .rail a.nav.active { background: var(--blue-soft); color: var(--blue); }
 .rail .foot { margin-top: auto; border-top: 1px solid var(--line); padding-top: 12px; font-size: 13px; color: var(--muted); }
+.rail .foot b { color: var(--ink); }
+/* Incolo's admin portal: a dark rail and an "Admin" tag, so it's never mistaken for a clinic's portal. */
+.rail-tag { font: 700 11px var(--font-body); letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 7px; border-radius: 6px; background: var(--blue); color: #fff; }
+.app.admin .rail { background: #0f172a; border-right-color: #0f172a; color: #cbd5e1; }
+.app.admin .rail .brand { color: #fff; }
+.app.admin .rail .brand-mark::after { background: #0f172a; }
+.app.admin .rail a.nav { color: #cbd5e1; }
+.app.admin .rail a.nav:hover { background: rgba(255, 255, 255, 0.07); }
+.app.admin .rail a.nav.active { background: rgba(107, 155, 255, 0.2); color: #fff; }
+.app.admin .rail .foot { border-top-color: rgba(255, 255, 255, 0.14); color: #94a3b8; }
+.app.admin .rail .foot b { color: #fff; }
+.app.admin .rail button.ghost { color: #cbd5e1; }
+.app.admin .rail button.ghost:hover { background: rgba(255, 255, 255, 0.07); }
 .main { min-width: 0; }
 .mainbar { display: flex; align-items: center; gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--line); background: var(--card); position: sticky; top: 0; z-index: 5; }
 .mainbar .clinic { font: 600 15px var(--font-display); }

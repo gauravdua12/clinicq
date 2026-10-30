@@ -24,7 +24,7 @@ import { webhookRoutes } from "./routes/webhook";
 import { AiRuntime } from "./services/ai";
 import { EventBus } from "./sse";
 import { inScope } from "./scope";
-import { scopeForRequest } from "./services/tenancy";
+import { clinicActive, scopeForRequest } from "./services/tenancy";
 import { RoutedWhatsApp } from "./services/whatsapp";
 
 export interface BuildOpts { env: Env; db?: Db; wa?: WhatsAppClient; clock?: Clock; log?: Logger; serveStatic?: boolean }
@@ -60,8 +60,16 @@ export async function buildApp(opts: BuildOpts): Promise<{ app: FastifyInstance;
   await app.register(cookie, { secret: env.SESSION_SECRET });
   // Every request runs in its clinic's scope (src/scope.ts). preValidation: after the body is read, so the scope
   // isn't lost to the body stream's own async context.
-  app.addHook("preValidation", (req, _reply, done) => {
-    scopeForRequest(ctx, req).then((scope) => inScope(scope, done), (e: Error) => done(e));
+  // A suspended or archived customer clinic: its dashboard, TV, booking and pay pages answer 403 clinic_paused.
+  app.addHook("preValidation", (req, reply, done) => {
+    scopeForRequest(ctx, req).then(async (scope) => {
+      const url = req.url.slice(env.BASE_PATH.length);
+      if (scope.clinicId && url.startsWith("/api/") && !url.startsWith("/api/auth/") && !(await clinicActive(ctx, scope.clinicId))) {
+        reply.code(403).send({ error: { code: "clinic_paused" } });
+        return;
+      }
+      inScope(scope, done);
+    }, (e: Error) => done(e));
   });
   if (env.WEB_DEV_ORIGIN && env.NODE_ENV !== "production") await app.register(cors, { origin: env.WEB_DEV_ORIGIN, credentials: true });
   app.addHook("onSend", async (_req, reply, payload) => {

@@ -138,7 +138,7 @@ describe("connecting a customer clinic's own WhatsApp number", () => {
 
 describe("customer clinics (Incolo admins)", () => {
   it("create one with the doctor's number; listed with its WhatsApp status; the doctor can then sign in to it", async () => {
-    const admin = (await h.app.inject({ method: "POST", url: "/api/auth/dev-login", payload: { role: "DOCTOR" } })).cookies.find((c) => c.name === "sid")!.value;
+    const admin = (await h.app.inject({ method: "POST", url: "/api/auth/dev-login", payload: { role: "INCOLO" } })).cookies.find((c) => c.name === "sid")!.value;
     const r = await api(admin, "POST", "/api/admin/clinics", { clinicName: "Care Plus Clinic", doctorName: "Dr. Rao", doctorPhone: "98450 12345", addressShort: "Indiranagar, Bengaluru", clinicPhone: "+91 80 4000 1111" });
     expect(r.statusCode).toBe(200);
     expect((await api(admin, "POST", "/api/admin/clinics", { clinicName: "Dup", doctorName: "Dr. X", doctorPhone: "98450 12345", addressShort: "x y", clinicPhone: "1234567" })).json()).toMatchObject({ error: { code: "phone_in_use" } });

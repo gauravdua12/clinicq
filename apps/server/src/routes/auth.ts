@@ -4,6 +4,9 @@ import { copy } from "@clinicq/core";
 import { decrypt, encrypt, normalizeIndianPhone, phoneHash, type StaffUser } from "@clinicq/db";
 import type { Ctx } from "../context";
 import { sendTo } from "../services/notify";
+import { ensureAdmins, isIncoloAdmin } from "../services/admins";
+import { isManager } from "../services/staff";
+import { clinicActive } from "../services/tenancy";
 import { inScope } from "../scope";
 
 // Staff login: WhatsApp OTP (auth template) → httpOnly session cookie (PRD DB-01).
@@ -13,38 +16,24 @@ const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
 declare module "fastify" { interface FastifyRequest { staff?: StaffUser } }
 
-export async function requireStaff(ctx: Ctx, req: FastifyRequest, reply: FastifyReply, role?: "DOCTOR"): Promise<StaffUser | null> {
+/** A signed-in clinic login; "MANAGE" = the clinic's doctor or clinic admin. */
+export async function requireStaff(ctx: Ctx, req: FastifyRequest, reply: FastifyReply, role?: "MANAGE"): Promise<StaffUser | null> {
   const sid = req.cookies?.sid;
   if (!sid) { reply.code(401).send({ error: { code: "unauthenticated" } }); return null; }
   const s = await ctx.db.staffSession.findUnique({ where: { id: sha(sid) } });
   if (!s || s.expiresAt < ctx.clock.now()) { reply.code(401).send({ error: { code: "unauthenticated" } }); return null; }
   const staff = await ctx.db.staffUser.findUnique({ where: { id: s.staffId } });
   if (!staff?.active) { reply.code(401).send({ error: { code: "unauthenticated" } }); return null; }
-  if (role === "DOCTOR" && staff.role !== "DOCTOR") { reply.code(403).send({ error: { code: "forbidden" } }); return null; }
+  if (role === "MANAGE" && !isManager(staff)) { reply.code(403).send({ error: { code: "forbidden" } }); return null; }
   req.staff = staff;
   return staff;
 }
 
-/**
- * Incolo's internal admins (INCOLO_ADMIN_PHONES): the only people who see the language-model settings and Demo Studio.
- * A clinic's doctor is an admin of their clinic, not of the platform. On a dev machine (dev tools, not production)
- * doctors count as internal admins so everything can be tried locally.
- */
-export function isIncoloAdmin(ctx: Ctx, staff: StaffUser): boolean {
-  if (isListedIncoloAdmin(ctx, staff)) return true;
-  return ctx.env.DEV_TOOLS && ctx.env.NODE_ENV !== "production" && staff.role === "DOCTOR";
-}
-
-/** A number in INCOLO_ADMIN_PHONES itself (no dev-machine allowance): these logins can't be switched off from a clinic. */
-export function isListedIncoloAdmin(ctx: Ctx, staff: StaffUser): boolean {
-  const list = ctx.env.INCOLO_ADMIN_PHONES.split(",").map((p) => normalizeIndianPhone(p)).filter(Boolean);
-  return list.includes(decrypt(staff.waPhone));
-}
-
+/** Incolo's own admins (services/admins.ts): the admin portal. A clinic's doctor manages their clinic, never the platform. */
 export async function requireIncoloAdmin(ctx: Ctx, req: FastifyRequest, reply: FastifyReply): Promise<StaffUser | null> {
   const s = await requireStaff(ctx, req, reply);
   if (!s) return null;
-  if (!isIncoloAdmin(ctx, s)) { reply.code(403).send({ error: { code: "forbidden" } }); return null; }
+  if (!(await isIncoloAdmin(ctx, s))) { reply.code(403).send({ error: { code: "forbidden" } }); return null; }
   return s;
 }
 
@@ -82,7 +71,7 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> 
     const wa = normalizeIndianPhone(String((req.body as { phone?: string })?.phone ?? ""));
     if (!wa) return { ok: true };
     const staff = await ctx.db.staffUser.findUnique({ where: { phoneHash: phoneHash(wa) } });
-    if (!staff?.active) return { ok: true }; // no enumeration
+    if (!staff?.active || !(await clinicActive(ctx, staff.clinicId))) return { ok: true }; // no enumeration; a paused clinic can't sign in
     const recent = await ctx.db.otpChallenge.findUnique({ where: { phoneHash: staff.phoneHash } });
     if (recent && recent.expiresAt.getTime() - ctx.clock.now().getTime() > 4 * 60_000) return { ok: true }; // throttle: 1/min
     // The App Review login: its fixed code is checked like any other, and nothing is sent on WhatsApp.
@@ -108,12 +97,12 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> 
     const wa = normalizeIndianPhone(String(b?.phone ?? ""));
     const staff = wa ? await ctx.db.staffUser.findUnique({ where: { phoneHash: phoneHash(wa) } }) : null;
     const ch = staff ? await ctx.db.otpChallenge.findUnique({ where: { phoneHash: staff.phoneHash } }) : null;
-    if (!staff?.active || !ch || ch.expiresAt < ctx.clock.now() || ch.attempts >= 5) return reply.code(401).send({ error: { code: "invalid_code" } });
+    if (!staff?.active || !(await clinicActive(ctx, staff.clinicId)) || !ch || ch.expiresAt < ctx.clock.now() || ch.attempts >= 5) return reply.code(401).send({ error: { code: "invalid_code" } });
     const ok = timingSafeEqual(Buffer.from(sha(String(b.code ?? ""))), Buffer.from(ch.codeHash));
     if (!ok) { await ctx.db.otpChallenge.update({ where: { phoneHash: ch.phoneHash }, data: { attempts: { increment: 1 } } }); return reply.code(401).send({ error: { code: "invalid_code" } }); }
     await ctx.db.otpChallenge.delete({ where: { phoneHash: ch.phoneHash } });
     await startSession(ctx, reply, staff.id);
-    return { name: staff.name, role: staff.role };
+    return { name: staff.name, role: staff.role, incoloAdmin: await isIncoloAdmin(ctx, staff) };
   });
 
   app.post("/api/auth/logout", async (req, reply) => {
@@ -125,18 +114,35 @@ export async function authRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> 
 
   app.get("/api/me", async (req, reply) => {
     const s = await requireStaff(ctx, req, reply);
-    return s ? { name: s.name, role: s.role, incoloAdmin: isIncoloAdmin(ctx, s) } : undefined;
+    return s ? { name: s.name, role: s.role, incoloAdmin: await isIncoloAdmin(ctx, s) } : undefined;
   });
 
   if (ctx.env.DEV_TOOLS && ctx.env.NODE_ENV !== "production") {
     app.post("/api/auth/dev-login", async (req, reply) => {
-      const role = (req.body as { role?: string })?.role === "STAFF" ? "STAFF" : "DOCTOR";
-      const { clinicInfo } = await import("../services/clinic");
-      const staff = (await ctx.db.staffUser.findFirst({ where: { clinicId: (await clinicInfo(ctx).catch(() => null))?.clinic.id ?? "-", role, active: true } }))
-        ?? (await ctx.db.staffUser.findFirst({ where: { role, active: true }, orderBy: { name: "asc" } }));
+      const asked = (req.body as { role?: string })?.role;
+      let staff: StaffUser | null;
+      if (asked === "INCOLO") {
+        // An Incolo admin for trying the admin portal locally (a made-up number).
+        const wa = "919999900009";
+        await ctx.db.incoloAdmin.upsert({ where: { phoneHash: phoneHash(wa) }, create: { name: "Incolo admin (dev)", waPhone: encrypt(wa), phoneHash: phoneHash(wa) }, update: { active: true } });
+        await ensureAdmins(ctx);
+        staff = await ctx.db.staffUser.findUnique({ where: { phoneHash: phoneHash(wa) } });
+      } else {
+        const role = asked === "STAFF" ? "STAFF" : asked === "CLINIC_ADMIN" ? "CLINIC_ADMIN" : "DOCTOR";
+        const admins = (await ctx.db.incoloAdmin.findMany({ select: { phoneHash: true } })).map((a) => a.phoneHash);
+        const { clinicInfo } = await import("../services/clinic");
+        const where = { role, active: true, phoneHash: { notIn: admins } } as const;
+        const clinicId = (await clinicInfo(ctx).catch(() => null))?.clinic.id;
+        staff = (await ctx.db.staffUser.findFirst({ where: { ...where, clinicId: clinicId ?? "-" } }))
+          ?? (await ctx.db.staffUser.findFirst({ where, orderBy: { name: "asc" } }));
+        if (!staff && role === "CLINIC_ADMIN" && clinicId) { // the demo seed has none: a made-up one for trying the role
+          const wa = "919999900008";
+          staff = await ctx.db.staffUser.upsert({ where: { phoneHash: phoneHash(wa) }, create: { clinicId, name: "Kavita (clinic admin)", waPhone: encrypt(wa), phoneHash: phoneHash(wa), role: "CLINIC_ADMIN" }, update: { clinicId, role: "CLINIC_ADMIN", active: true } });
+        }
+      }
       if (!staff) return reply.code(404).send();
       await startSession(ctx, reply, staff.id);
-      return { name: staff.name, role: staff.role };
+      return { name: staff.name, role: staff.role, incoloAdmin: await isIncoloAdmin(ctx, staff) };
     });
   }
 }

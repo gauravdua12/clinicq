@@ -28,10 +28,19 @@ model Clinic {
   /// A customer clinic on its own WhatsApp number (Embedded Signup). Otherwise it runs on the shared demo number.
   ownNumber        Boolean     @default(false)
   demoSource       Json?       // { website?, specialty?, extractedBy? } — public business info only
+  /// Set by Incolo (customer clinics): SUSPENDED pauses logins and the bot; ARCHIVED is a clinic that left (data kept).
+  status           ClinicStatus @default(ACTIVE)
+  statusChangedAt  DateTime?
   createdAt        DateTime    @default(now())
   doctors          Doctor[]
   staff            StaffUser[]
   waConnection     WaConnection?
+}
+
+enum ClinicStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
 }
 
 // A customer clinic's own WhatsApp Business number, connected by the clinic through Embedded Signup.
@@ -113,9 +122,24 @@ model StaffUser {
   active    Boolean   @default(true)
 }
 
+/// DOCTOR and CLINIC_ADMIN manage the clinic (a clinic admin can't change doctor logins); STAFF run the desk.
 enum StaffRole {
   DOCTOR
+  CLINIC_ADMIN
   STAFF
+}
+
+// Incolo's own admins (the admin portal). Owners come from INCOLO_ADMIN_PHONES and can't be removed from the portal.
+// Each active admin also has a StaffUser login in the shared-number (demo) clinic, which is how they sign in and demo.
+model IncoloAdmin {
+  id        String   @id @default(cuid())
+  name      String
+  waPhone   String // enc
+  phoneHash String   @unique
+  owner     Boolean  @default(false)
+  active    Boolean  @default(true)
+  addedById String?
+  createdAt DateTime @default(now())
 }
 
 model PatientAccount {

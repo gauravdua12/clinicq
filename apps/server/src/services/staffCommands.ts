@@ -3,6 +3,7 @@ import { extract as X, time as T } from "@clinicq/core";
 import type { InboundMessage } from "@clinicq/wa";
 import type { Ctx } from "../context";
 import { presenterPhones } from "./demo";
+import { isAdminPhone } from "./admins";
 import { clinicInfo, currentSession, nowLocal } from "./clinic";
 import { applyClosure } from "./closures";
 import { sendTo } from "./notify";
@@ -29,8 +30,8 @@ const PRESENTER_HELP = [
   ...HELP.split("\n").slice(1).map((l) => `#${l}`),
 ].join("\n");
 
-function isPresenter(waId: string): boolean {
-  return presenterPhones().includes(waId);
+async function isPresenter(ctx: Ctx, waId: string): Promise<boolean> {
+  return presenterPhones().includes(waId) || (await isAdminPhone(ctx, waId));
 }
 
 async function load(ctx: Ctx, staffId: string): Promise<StaffConv> {
@@ -87,7 +88,7 @@ export async function handleStaffMessage(ctx: Ctx, staff: StaffUser, msg: Inboun
   let text = (msg.text ?? msg.buttonTitle ?? "").trim();
   // Demo presenters are doctor and patient on one phone: plain messages go to the patient side, desk commands
   // carry a "#" (or "/") prefix. Pending staff questions (overflow time, close-today confirm) still come here.
-  if (isPresenter(waId) && conv.state === "IDLE") {
+  if ((await isPresenter(ctx, waId)) && conv.state === "IDLE") {
     if (!/^[#/]/.test(text)) return false;
     text = text.replace(/^[#/]\s*/, "");
     if (!text || /^(help|commands?)$/i.test(text)) { await reply(PRESENTER_HELP); return true; }

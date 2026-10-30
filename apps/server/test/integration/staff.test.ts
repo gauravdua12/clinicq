@@ -58,6 +58,7 @@ describe("Settings → Staff protects the logins a clinic can't do without", () 
     const iyer = "919811100888";
     await h.db.staffUser.create({ data: { clinicId: clinic.id, name: "Dr. Iyer", waPhone: encrypt(iyer), phoneHash: phoneHash(iyer), role: "DOCTOR" } });
     await h.db.staffUser.update({ where: { phoneHash: phoneHash(other) }, data: { active: false } });
+    h.ctx.env.INCOLO_ADMIN_PHONES = ""; // no Incolo admin login in the demo clinic either (theirs would count as a doctor)
     await activateDemo(h.ctx, await clinicId(), null);
     expect(code(await patch(await login(iyer), await idOf(SEED.doctorPhone), { active: false }))).toBe("last_doctor");
   });

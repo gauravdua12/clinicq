@@ -19,6 +19,7 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
   if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/auth") && !path.startsWith("/api/display")) {
     window.location.href = `${BASE}/login`;
   }
+  if (res.status === 403 && json?.error?.code === "clinic_paused" && typeof window !== "undefined") window.location.href = `${BASE}/login?paused=1`;
   if (!res.ok) throw new ApiError(res.status, json?.error?.code ?? json?.reason ?? "error", json);
   return json as T;
 }

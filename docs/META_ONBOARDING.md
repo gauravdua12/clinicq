@@ -51,7 +51,7 @@ Sources: Meta's [Embedded Signup v4](https://developers.facebook.com/blog/post/2
 
 ## C. A customer's own number (recommended for live clinics; about 15 minutes with the doctor) — built Oct 2026
 Uses **Embedded Signup**: the customer owns the WABA (in their own Meta portfolio), Incolo gets access as Tech Provider, and the customer pays Meta directly. Facebook Login for Business configuration: **1454298736672568** (WhatsApp Cloud API only; env `META_ES_CONFIG_ID`).
-1. **Incolo admin:** the **Customer clinics** page (menu; Incolo admins only, also a phone tab) → add the clinic (name, doctor's name and WhatsApp number, clinic phone, short address). It starts with Mon–Sat 10–1 and 5–8 sessions.
+1. **Incolo admin:** sign in (you land in the **admin portal**) → **Clinics** → **+ Add clinic** (name, doctor's name and WhatsApp number, clinic phone, short address). It starts with Mon–Sat 10–1 and 5–8 sessions.
 2. **Doctor:** signs in at https://q.incolo.si/login with their WhatsApp number, checks Settings → Clinic and Sessions, then Settings → **WhatsApp** → **Connect WhatsApp** (or *I use the WhatsApp Business app on this number* for coexistence).
 3. In Meta's pop-up the doctor logs in with Facebook → creates or picks their **business portfolio** → adds and verifies the **clinic number** (SMS or call). **Display name** = the clinic's name.
 4. Q-Incolo then, by itself: exchanges the code for the clinic's token (encrypted), checks the number, subscribes the account to our webhook, registers the number (two-step PIN kept encrypted), and submits all templates (EN + HI) for approval. Settings → WhatsApp shows display-name status, quality, messaging limit and template approvals (*Check status*, *Send missing templates*, *Disconnect*).

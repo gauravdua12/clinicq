@@ -4,20 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, BASE } from "@/lib/api";
 import { Shell } from "@/lib/Shell";
 import { WhatsAppTab } from "@/lib/WhatsAppConnect";
+import { Logins, type LoginRow } from "@/lib/Logins";
 
-type Tab = "clinic" | "sessions" | "closures" | "staff" | "whatsapp" | "model" | "qr";
+type Tab = "clinic" | "sessions" | "closures" | "staff" | "whatsapp" | "qr";
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function Settings() {
   const [tab, setTab] = useState<Tab>("clinic");
-  // "Language model" is for Incolo's internal admins only, never for clinic staff.
-  const [incolo, setIncolo] = useState(false);
+  // Everything a clinic needs. Incolo's own settings (language model, clinics, demos) are in the admin portal.
   const [ownNumber, setOwnNumber] = useState(false);
-  useEffect(() => {
-    api<{ incoloAdmin?: boolean }>("/api/me").then((m) => setIncolo(!!m?.incoloAdmin)).catch(() => undefined);
-    api<{ ownNumber?: boolean }>("/api/clinic").then((c) => setOwnNumber(!!c?.ownNumber)).catch(() => undefined);
-  }, []);
-  const tabs: [Tab, string][] = [["clinic", "Clinic"], ["sessions", "Sessions"], ["closures", "Holidays & leave"], ["staff", "Staff"], ...(ownNumber ? [["whatsapp", "WhatsApp"] as [Tab, string]] : []), ...(incolo ? [["model", "Language model"] as [Tab, string]] : []), ["qr", "Walk-in QR & TV"]];
+  useEffect(() => { api<{ ownNumber?: boolean }>("/api/clinic").then((c) => setOwnNumber(!!c?.ownNumber)).catch(() => undefined); }, []);
+  const tabs: [Tab, string][] = [["clinic", "Clinic"], ["sessions", "Sessions"], ["closures", "Holidays & leave"], ["staff", "Staff"], ...(ownNumber ? [["whatsapp", "WhatsApp"] as [Tab, string]] : []), ["qr", "Walk-in QR & TV"]];
   return (
     <Shell active="/settings">
       <h1>Settings</h1>
@@ -27,7 +24,6 @@ export default function Settings() {
       {tab === "closures" && <ClosuresTab />}
       {tab === "staff" && <StaffTab />}
       {tab === "whatsapp" && ownNumber && <WhatsAppTab />}
-      {tab === "model" && incolo && <ModelTab />}
       {tab === "qr" && <QrTab />}
     </Shell>
   );
@@ -188,98 +184,12 @@ function ClosuresTab() {
   );
 }
 
-const STAFF_ERR: Record<string, string> = {
-  own_login: "You can't deactivate or demote your own login.",
-  incolo_admin: "This is an Incolo admin login. It can't be deactivated or demoted here.",
-  last_doctor: "This is the clinic's only active doctor login. Add or activate another doctor first.",
-  not_found: "This login is no longer here. Refresh the page.",
-  phone_in_use: "This WhatsApp number still signs in to another clinic. Ask that clinic to deactivate it in Settings → Staff, then add it here.",
-};
-
 function StaffTab() {
-  const [rows, setRows] = useState<{ id: string; name: string; role: string; onDuty: boolean; active: boolean; phone: string; you: boolean; incoloAdmin: boolean }[]>([]);
-  const [name, setName] = useState(""); const [phone, setPhone] = useState(""); const [role, setRole] = useState("STAFF");
-  const s = useSaved();
-  const load = useCallback(() => api<typeof rows>("/api/settings/staff").then(setRows), []);
-  useEffect(() => { void load(); }, [load]);
-  return (
-    <div className="card" style={{ maxWidth: 720 }}>
-      <table><thead><tr><th>Name</th><th>WhatsApp</th><th>Role</th><th>On duty</th><th /></tr></thead>
-        <tbody>{rows.map((r) => (
-          <tr key={r.id} style={{ opacity: r.active ? 1 : 0.5 }}>
-            <td>{r.name} {r.you && <span className="pill">You</span>} {r.incoloAdmin && <span className="pill blue">Incolo admin</span>}</td><td>{r.phone}</td><td>{r.role === "DOCTOR" ? "Doctor (admin)" : "Staff"}</td>
-            <td><input type="checkbox" style={{ width: "auto", minHeight: 0 }} checked={r.onDuty} onChange={async (e) => { await api(`/api/settings/staff/${r.id}`, { method: "PATCH", body: { onDuty: e.target.checked } }); void load(); }} /></td>
-            <td>{r.active && (r.you || r.incoloAdmin) ? null : <button className="ghost small" onClick={async () => {
-              if (r.active && !confirm(`Deactivate ${r.name}? They won't be able to sign in until you activate them again.`)) return;
-              try { await api(`/api/settings/staff/${r.id}`, { method: "PATCH", body: { active: !r.active } }); s.ok(r.active ? `${r.name} deactivated` : `${r.name} activated`); }
-              catch (e) { s.err((e instanceof ApiError && STAFF_ERR[e.code]) || "Couldn't change this login. Try again."); }
-              void load();
-            }}>{r.active ? "Deactivate" : "Activate"}</button>}
-              {!(r.you || r.incoloAdmin) && <button className="ghost small warn" style={{ marginLeft: 6 }} onClick={async () => {
-                if (!confirm(`Remove ${r.name} permanently? Their login is deleted and they can't sign in. To give them access again, add them as new staff.`)) return;
-                try { await api(`/api/settings/staff/${r.id}`, { method: "DELETE" }); s.ok(`${r.name} removed`); }
-                catch (e) { s.err((e instanceof ApiError && STAFF_ERR[e.code]) || "Couldn't remove this login. Try again."); }
-                void load();
-              }}>Remove</button>}</td>
-          </tr>
-        ))}</tbody></table>
-      <h2 style={{ marginTop: 16 }}>Add staff</h2>
-      <div className="row">
-        <input style={{ flex: 2 }} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-        <input style={{ flex: 2 }} placeholder="WhatsApp number" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        <select style={{ flex: 1 }} value={role} onChange={(e) => setRole(e.target.value)}><option value="STAFF">Staff</option><option value="DOCTOR">Doctor (admin)</option></select>
-        <button className="primary" onClick={async () => { try { const r = await api<{ moved?: boolean }>("/api/settings/staff", { body: { name, phone, role } }); setName(""); setPhone(""); s.ok(r.moved ? "Added. Their login moved here from their previous clinic" : "Added"); void load(); } catch (e) { s.err((e instanceof ApiError && STAFF_ERR[e.code]) || "Check the name and 10-digit number."); } }}>Add</button>
-      </div>
-      {s.state.ok && <div className="ok">{s.state.ok}</div>}{s.state.err && <div className="err">{s.state.err}</div>}
-    </div>
-  );
-}
-
-interface CatalogModel { spec: string; label: string; openWeight: boolean; residency: string; inPerM: number | null; outPerM: number | null; tier: string }
-interface AiCfg { primary: string; escalation: string; minConfidence: number; timeoutMs: number; stt: string; sttFallback: string }
-interface Smoke { passed: number; total: number; safetyMisses: string[]; failures: string[]; avgMs: number }
-
-function ModelTab() {
-  const [cfg, setCfg] = useState<AiCfg | null>(null);
-  const [catalog, setCatalog] = useState<CatalogModel[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [result, setResult] = useState<{ ok?: boolean; reason?: string; smoke?: Smoke } | null>(null);
-  useEffect(() => { api<{ config: AiCfg; catalog: CatalogModel[] }>("/api/settings/ai").then((r) => { setCfg(r.config); setCatalog(r.catalog); }); }, []);
-  if (!cfg) return <p className="muted">Loading…</p>;
-  const opt = (m: CatalogModel) => <option key={m.spec} value={m.spec}>{m.label} · {m.residency === "in" ? "India" : m.residency} · ${m.inPerM}/${m.outPerM} per M</option>;
-  return (
-    <div className="card" style={{ maxWidth: 720 }}>
-      <p className="small muted">Understands patients' free-text and voice messages (booking details only). The primary model handles every message; when it is unsure, the failover model double-checks. Before a change is saved, a live test of 12 messages runs; it must catch every emergency and health-detail case.</p>
-      <label>Primary model (every message)</label>
-      <select value={cfg.primary} onChange={(e) => { setCfg({ ...cfg, primary: e.target.value }); setResult(null); }}>
-        <option value="rules">Built-in rules only (no AI)</option>
-        {catalog.map(opt)}
-      </select>
-      <label>Failover model (when the primary is unsure or fails)</label>
-      <select value={cfg.escalation} onChange={(e) => { setCfg({ ...cfg, escalation: e.target.value }); setResult(null); }}>
-        <option value="">None</option>
-        {catalog.map(opt)}
-      </select>
-      <label>Custom model spec (optional, e.g. openai-compat:qwen3-32b for a self-hosted server)</label>
-      <input placeholder="leave empty to use the selections above" onBlur={(e) => e.target.value && setCfg({ ...cfg, primary: e.target.value })} />
-      <div className="row">
-        <div style={{ flex: 1 }}><label>Failover when confidence below</label><input type="number" step="0.05" min={0} max={1} value={cfg.minConfidence} onChange={(e) => setCfg({ ...cfg, minConfidence: Number(e.target.value) })} /></div>
-        <div style={{ flex: 1 }}><label>Timeout (ms)</label><input type="number" value={cfg.timeoutMs} onChange={(e) => setCfg({ ...cfg, timeoutMs: Number(e.target.value) })} /></div>
-      </div>
-      <label>Voice notes (speech-to-text)</label>
-      <select value={cfg.stt} onChange={(e) => setCfg({ ...cfg, stt: e.target.value })}>
-        <option value="voxtral-small">Voxtral Small 24B (Bedrock, India)</option><option value="voxtral-mini">Voxtral Mini 3B (Bedrock, India)</option><option value="transcribe">Amazon Transcribe (India)</option><option value="sarvam">Sarvam AI</option><option value="openai-compat">Self-hosted Whisper</option><option value="mock">Simulator (dev)</option>
-      </select>
-      <button className="primary" style={{ marginTop: 14 }} disabled={saving} onClick={async () => {
-        setSaving(true); setResult(null);
-        try { const r = await api<{ saved: boolean; smoke?: Smoke }>("/api/settings/ai", { method: "PUT", body: cfg }); setResult({ ok: r.saved, smoke: r.smoke }); }
-        catch (e) { const b = (e as ApiError).body as { reason?: string; smoke?: Smoke }; setResult({ ok: false, reason: b?.reason, smoke: b?.smoke }); }
-        finally { setSaving(false); }
-      }}>{saving ? "Testing the model…" : "Test & save"}</button>
-      {result?.ok && <div className="ok">Saved. Live test: {result.smoke ? `${result.smoke.passed}/${result.smoke.total} passed, avg ${result.smoke.avgMs} ms` : "skipped"}.</div>}
-      {result && !result.ok && <div className="err">Not saved{result.reason === "smoke_failed" && result.smoke ? `: live test ${result.smoke.passed}/${result.smoke.total}${result.smoke.safetyMisses.length ? `, missed safety cases ${result.smoke.safetyMisses.join(", ")}` : ""}.` : result.reason ? `: ${result.reason}` : "."}</div>}
-    </div>
-  );
+  const [me, setMe] = useState<{ role: string } | null>(null);
+  useEffect(() => { api<{ role: string }>("/api/me").then(setMe).catch(() => undefined); }, []);
+  const list = useCallback(() => api<LoginRow[]>("/api/settings/staff"), []);
+  if (!me) return <p className="muted">Loading…</p>;
+  return <div className="card" style={{ maxWidth: 820 }}><Logins list={list} base="/api/settings/staff" canMakeDoctor={me.role === "DOCTOR"} /></div>;
 }
 
 function QrTab() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, BASE } from "@/lib/api";
 import { Stub } from "@/lib/Stub";
 
@@ -11,7 +11,10 @@ export default function Login() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const dev = process.env.NEXT_PUBLIC_DEV_TOOLS === "1";
-  const go = () => { window.location.href = `${BASE}/`; };
+  // Incolo admins land in the admin portal; a clinic's logins in their clinic.
+  const go = (r?: { incoloAdmin?: boolean }) => { window.location.href = `${BASE}${r?.incoloAdmin ? "/admin" : "/"}`; };
+  const [paused, setPaused] = useState(false);
+  useEffect(() => { setPaused(new URLSearchParams(window.location.search).has("paused")); }, []);
   return (
     <div className="split">
       <section className="hero">
@@ -33,6 +36,7 @@ export default function Login() {
             <h1 style={{ fontSize: 22 }}>Sign in</h1>
             <p className="muted small" style={{ margin: "4px 0 0" }}>Use the WhatsApp number registered for your clinic.</p>
           </div>
+          {paused && <div className="banner" role="status" style={{ margin: 0 }}>This clinic&apos;s Q-Incolo access is paused. Please contact Incolo Systems.</div>}
           {!sent ? (
             <form onSubmit={async (e) => {
               e.preventDefault();
@@ -45,7 +49,7 @@ export default function Login() {
               <button className="primary big" style={{ marginTop: 14 }} disabled={busy}>Send code on WhatsApp</button>
             </form>
           ) : (
-            <form onSubmit={async (e) => { e.preventDefault(); setBusy(true); try { await api("/api/auth/verify", { body: { phone, code } }); go(); } catch { setErr("That code didn't match. Check the latest WhatsApp message and try again."); } finally { setBusy(false); } }}>
+            <form onSubmit={async (e) => { e.preventDefault(); setBusy(true); try { go(await api<{ incoloAdmin?: boolean }>("/api/auth/verify", { body: { phone, code } })); } catch { setErr("That code didn't match. Check the latest WhatsApp message and try again."); } finally { setBusy(false); } }}>
               <p className="small" style={{ margin: 0 }}>We sent a 6-digit code to <b>{phone}</b> on WhatsApp.</p>
               <p className="small muted" style={{ margin: "6px 0 0" }}>Not received in a minute? From this phone, send "hi" to the clinic's Q-Incolo WhatsApp number, then tap <b>Use a different number</b> and send the code again.</p>
               <label htmlFor="cd">Code</label>
@@ -58,8 +62,9 @@ export default function Login() {
           {dev && (
             <div className="row small" style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
               <span className="muted">Dev sign-in:</span>
-              <button className="small" onClick={async () => { await api("/api/auth/dev-login", { body: { role: "DOCTOR" } }); go(); }}>Doctor</button>
-              <button className="small" onClick={async () => { await api("/api/auth/dev-login", { body: { role: "STAFF" } }); go(); }}>Staff</button>
+              {([["DOCTOR", "Doctor"], ["CLINIC_ADMIN", "Clinic admin"], ["STAFF", "Staff"], ["INCOLO", "Incolo admin"]] as const).map(([role, label]) => (
+                <button key={role} className="small" onClick={async () => go(await api<{ incoloAdmin?: boolean }>("/api/auth/dev-login", { body: { role } }))}>{label}</button>
+              ))}
               <a href={`${BASE}/dev/simulator`}>Simulator</a>
             </div>
           )}

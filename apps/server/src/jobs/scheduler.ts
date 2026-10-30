@@ -66,6 +66,7 @@ export class Scheduler {
           const h = this.handlers.get(r.name);
           if (!h) { this.log.warn({ job: r.name }, "no_handler"); continue; }
           const clinicId = typeof r.data?.clinicScope === "string" ? r.data.clinicScope : null;
+          if (clinicId && (await this.db.clinic.findUnique({ where: { id: clinicId }, select: { status: true } }))?.status !== "ACTIVE") continue; // suspended, archived or deleted: dropped
           try { await inScope({ clinicId }, () => h(r.data)); n++; } catch (e) { this.log.error({ err: e, job: r.name }, "job_failed"); }
         }
       }

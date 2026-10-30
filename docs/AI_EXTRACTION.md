@@ -72,7 +72,7 @@ EXTRACTOR_ESCALATION=bedrock-mantle:mistral.mistral-large-3-675b-instruct    # o
 STT_PROVIDER=voxtral-small   STT_FALLBACK=transcribe
 AWS_REGION=ap-south-1
 ```
-The admin can change these at runtime (Settings → Language model). `bedrock-mantle:` is the Bedrock OpenAI-compatible endpoint (`bedrock-mantle.<region>.api.aws`, SigV4).
+The admin can change these at runtime (admin portal → Language model). `bedrock-mantle:` is the Bedrock OpenAI-compatible endpoint (`bedrock-mantle.<region>.api.aws`, SigV4).
 1. Call **primary** (timeout 3.5 s).
 2. **Escalate** to the escalation model when any of these hold:
    - the primary errors, times out, or returns JSON that fails the schema;

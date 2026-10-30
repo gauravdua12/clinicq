@@ -12,35 +12,19 @@ import { createProfile, findOrCreateAccount, firstName } from "../services/patie
 import * as Q from "../services/queue";
 import * as R from "../services/reminders";
 import { clinicWaNumber } from "../services/whatsapp";
-import { createCustomerClinic, CustomerError, listCustomerClinics } from "../services/customers";
-import { isIncoloLogin, moveReleasedLogin } from "../services/staff";
+import { createCustomerClinic, CustomerError, customerClinic, deleteCustomerClinic, listCustomerClinics, setClinicStatus } from "../services/customers";
+import { addLogin, listLogins, removeLogin, StaffError, updateLogin } from "../services/staff";
+import { addAdmin, AdminError, listAdmins, removeAdmin, setAdminActive } from "../services/admins";
 import * as ES from "../services/embeddedSignup";
 import { decideOverflow, walkinLink } from "../services/walkin";
 import { ClinicSettings } from "../settings";
 import { activateDemo, createDemo, deleteDemo, extractProfile, resetDemo, type ClinicProfile } from "../services/demo";
 import type { AiRuntime } from "../services/ai";
-import { isListedIncoloAdmin, requireIncoloAdmin, requireStaff } from "./auth";
+import { requireIncoloAdmin, requireStaff } from "./auth";
 
 // REST API for the dashboard and TV (docs/API.md). Phone numbers never appear in list views.
 
 function sendErr(reply: FastifyReply, code: number, c: string) { return reply.code(code).send({ error: { code: c } }); }
-
-/**
- * Logins that must never be switched off or demoted from Settings → Staff: your own, an Incolo admin's, and a clinic's
- * last active doctor (without one, nobody could sign in to manage the clinic). Returns the refusal code, or null.
- */
-async function staffChangeRefused(ctx: Ctx, actor: StaffUser, target: StaffUser, change: { active?: boolean; role?: "DOCTOR" | "STAFF" }): Promise<string | null> {
-  const removes = change.active === false && target.active;
-  const demotes = change.role === "STAFF" && target.role === "DOCTOR";
-  if (!removes && !demotes) return null;
-  if (target.id === actor.id) return "own_login";
-  if (isListedIncoloAdmin(ctx, target)) return "incolo_admin";
-  if (target.role === "DOCTOR" && target.active) {
-    const others = await ctx.db.staffUser.count({ where: { clinicId: target.clinicId, role: "DOCTOR", active: true, id: { not: target.id } } });
-    if (!others) return "last_doctor";
-  }
-  return null;
-}
 
 async function wrapQueue(reply: FastifyReply, fn: () => Promise<unknown>) {
   try { return await fn(); } catch (e) {
@@ -62,11 +46,6 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
   ];
   app.addHook("preHandler", async (req, reply) => {
     const path = req.url.slice(ctx.env.BASE_PATH.length).split("?")[0]!;
-    if (req.method === "PATCH" && /^\/api\/settings\/staff\/[^/]+$/.test(path)) {
-      const staff = await ctx.db.staffUser.findUnique({ where: { id: path.split("/").pop()! }, select: { clinicId: true } });
-      if (staff && staff.clinicId !== (await clinicInfo(ctx)).clinic.id) return sendErr(reply, 404, "not_found");
-      return;
-    }
     for (const [re, doctorOf] of OWNED) {
       const m = path.match(re);
       if (!m) continue;
@@ -280,13 +259,13 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
 
   // ── settings (doctor only) ──
   app.get("/api/settings/clinic", async (req, reply) => {
-    if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return;
+    if (!(await requireStaff(ctx, req, reply, "MANAGE"))) return;
     const info = await clinicInfo(ctx);
     const c = info.clinic;
     return { name: c.name, addressShort: c.addressShort, addressFull: c.addressFull, mapsUrl: c.mapsUrl, phone: c.phone, code: c.code, noticeUrl: c.noticeUrl, grievanceContact: c.grievanceContact, doctorName: info.doctor.displayName, qualification: info.doctor.qualification, settings: info.settings };
   });
   app.put("/api/settings/clinic", async (req, reply) => {
-    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
+    const s = await requireStaff(ctx, req, reply, "MANAGE"); if (!s) return;
     const b = z.object({
       name: z.string().min(1).max(80).optional(), addressShort: z.string().max(80).optional(), addressFull: z.string().max(300).optional(), mapsUrl: z.string().url().nullable().optional(),
       phone: z.string().max(20).optional(), noticeUrl: z.string().max(200).optional(), doctorName: z.string().max(60).optional(), qualification: z.string().max(100).nullable().optional(),
@@ -303,9 +282,9 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
     invalidateClinicCache();
     return { ok: true };
   });
-  app.get("/api/settings/sessions", async (req, reply) => { if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return; const info = await clinicInfo(ctx); return ctx.db.session.findMany({ where: { doctorId: info.doctor.id }, orderBy: [{ weekday: "asc" }, { startTime: "asc" }] }); });
+  app.get("/api/settings/sessions", async (req, reply) => { if (!(await requireStaff(ctx, req, reply, "MANAGE"))) return; const info = await clinicInfo(ctx); return ctx.db.session.findMany({ where: { doctorId: info.doctor.id }, orderBy: [{ weekday: "asc" }, { startTime: "asc" }] }); });
   app.put("/api/settings/sessions", async (req, reply) => {
-    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
+    const s = await requireStaff(ctx, req, reply, "MANAGE"); if (!s) return;
     const Sess = z.object({ weekday: z.number().int().min(0).max(6), label: z.string().min(1).max(20), startTime: z.string().regex(/^\d{2}:\d{2}$/), endTime: z.string().regex(/^\d{2}:\d{2}$/), slotMinutes: z.number().int().min(1).max(120), maxSlots: z.number().int().min(1).max(300).nullable().optional(), walkinQuota: z.number().int().min(0).max(200) });
     const b = z.array(Sess).safeParse(req.body);
     if (!b.success) return sendErr(reply, 400, "bad_request");
@@ -330,69 +309,46 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
   });
   app.get("/api/settings/closures", async (req, reply) => { if (!(await requireStaff(ctx, req, reply))) return; const info = await clinicInfo(ctx); return ctx.db.closure.findMany({ where: { doctorId: info.doctor.id, date: { gte: T.dateToDb(nowLocal(ctx).date) } }, orderBy: { date: "asc" } }); });
   app.post("/api/settings/closures", async (req, reply) => {
-    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
+    const s = await requireStaff(ctx, req, reply, "MANAGE"); if (!s) return;
     const b = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), sessionId: z.string().nullable().default(null), label: z.string().max(40).optional(), confirm: z.boolean().default(false) }).safeParse(req.body);
     if (!b.success) return sendErr(reply, 400, "bad_request");
     if (!b.data.confirm) return { affectedAppointments: await affectedByClosure(ctx, b.data.date, b.data.sessionId) };
     return { affected: await applyClosure(ctx, { date: b.data.date, sessionId: b.data.sessionId, label: b.data.label, actorId: s.id }) };
   });
-  app.delete("/api/settings/closures/:id", async (req, reply) => { const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return; await ctx.db.closure.delete({ where: { id: (req.params as { id: string }).id } }); await audit(ctx, "DOCTOR", s.id, "closure.remove", "Closure", (req.params as { id: string }).id); return { ok: true }; });
+  app.delete("/api/settings/closures/:id", async (req, reply) => { const s = await requireStaff(ctx, req, reply, "MANAGE"); if (!s) return; await ctx.db.closure.delete({ where: { id: (req.params as { id: string }).id } }); await audit(ctx, "DOCTOR", s.id, "closure.remove", "Closure", (req.params as { id: string }).id); return { ok: true }; });
+  // Settings → Staff: the clinic's doctor or clinic admin (rules in services/staff.ts).
+  const StaffIn = z.object({ name: z.string().trim().min(1).max(60), phone: z.string().max(20), role: z.enum(["DOCTOR", "CLINIC_ADMIN", "STAFF"]).default("STAFF") });
+  const StaffPatch = z.object({ onDuty: z.boolean().optional(), active: z.boolean().optional(), role: z.enum(["DOCTOR", "CLINIC_ADMIN", "STAFF"]).optional() });
+  const staffOp = async (reply: FastifyReply, fn: () => Promise<unknown>) => {
+    try { return (await fn()) ?? { ok: true }; } catch (e) {
+      if (e instanceof StaffError) return sendErr(reply, e.code === "not_found" ? 404 : e.code === "bad_request" ? 400 : 409, e.code);
+      throw e;
+    }
+  };
   app.get("/api/settings/staff", async (req, reply) => {
-    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
-    const rows = await ctx.db.staffUser.findMany({ where: { clinicId: (await clinicInfo(ctx)).clinic.id }, orderBy: { name: "asc" } });
-    return rows.map((r) => ({ id: r.id, name: r.name, role: r.role, onDuty: r.onDuty, active: r.active, phone: maskPhone(decrypt(r.waPhone)), you: r.id === s.id, incoloAdmin: isListedIncoloAdmin(ctx, r) }));
+    const s = await requireStaff(ctx, req, reply, "MANAGE"); if (!s) return;
+    return listLogins(ctx, (await clinicInfo(ctx)).clinic.id, s);
   });
   app.post("/api/settings/staff", async (req, reply) => {
-    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
-    const b = z.object({ name: z.string().min(1).max(60), phone: z.string(), role: z.enum(["DOCTOR", "STAFF"]).default("STAFF") }).safeParse(req.body);
-    const wa = b.success ? normalizeIndianPhone(b.data.phone) : null;
-    if (!b.success || !wa) return sendErr(reply, 400, "bad_request");
-    const info = await clinicInfo(ctx);
-    const existing = await ctx.db.staffUser.findUnique({ where: { phoneHash: phoneHash(wa) } });
-    if (existing && existing.clinicId !== info.clinic.id) { // another clinic's login: moves here only once that clinic has released it
-      if (!(await moveReleasedLogin(ctx, existing, wa, info.clinic.id, { name: b.data.name, role: b.data.role }))) return sendErr(reply, 409, "phone_in_use");
-      await audit(ctx, "DOCTOR", s.id, "staff.move_in", "StaffUser", existing.id);
-      return { id: existing.id, moved: true };
-    }
-    const refused = existing && (await staffChangeRefused(ctx, s, existing, { role: b.data.role }));
-    if (refused) return sendErr(reply, 409, refused);
-    const u = await ctx.db.staffUser.upsert({ where: { phoneHash: phoneHash(wa) }, create: { clinicId: info.clinic.id, name: b.data.name, waPhone: encrypt(wa), phoneHash: phoneHash(wa), role: b.data.role }, update: { name: b.data.name, role: b.data.role, active: true } });
-    await audit(ctx, "DOCTOR", s.id, "staff.upsert", "StaffUser", u.id);
-    return { id: u.id };
+    const s = await requireStaff(ctx, req, reply, "MANAGE"); if (!s) return;
+    const b = StaffIn.safeParse(req.body); if (!b.success) return sendErr(reply, 400, "bad_request");
+    return staffOp(reply, async () => addLogin(ctx, (await clinicInfo(ctx)).clinic.id, { staff: s, incolo: false }, b.data));
   });
   app.patch("/api/settings/staff/:id", async (req, reply) => {
-    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
-    const b = z.object({ onDuty: z.boolean().optional(), active: z.boolean().optional() }).safeParse(req.body);
-    if (!b.success) return sendErr(reply, 400, "bad_request");
-    const target = await ctx.db.staffUser.findUnique({ where: { id: (req.params as { id: string }).id } });
-    if (!target || target.clinicId !== (await clinicInfo(ctx)).clinic.id) return sendErr(reply, 404, "not_found");
-    const refused = await staffChangeRefused(ctx, s, target, b.data);
-    if (refused) return sendErr(reply, 409, refused);
-    await ctx.db.staffUser.update({ where: { id: target.id }, data: b.data });
-    await audit(ctx, "DOCTOR", s.id, "staff.update", "StaffUser", (req.params as { id: string }).id, b.data);
-    return { ok: true };
+    const s = await requireStaff(ctx, req, reply, "MANAGE"); if (!s) return;
+    const b = StaffPatch.safeParse(req.body); if (!b.success) return sendErr(reply, 400, "bad_request");
+    return staffOp(reply, async () => updateLogin(ctx, (await clinicInfo(ctx)).clinic.id, { staff: s, incolo: false }, (req.params as { id: string }).id, b.data));
   });
-  // Remove: the login is deleted for good (sign-ins and any pending login code too), which also frees the number for
-  // another clinic. The same logins are protected as for Deactivate; Incolo's own logins are never removed.
   app.delete("/api/settings/staff/:id", async (req, reply) => {
-    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
-    const info = await clinicInfo(ctx);
-    const target = await ctx.db.staffUser.findUnique({ where: { id: (req.params as { id: string }).id } });
-    if (!target || target.clinicId !== info.clinic.id) return sendErr(reply, 404, "not_found");
-    const refused = target.id === s.id ? "own_login" : isIncoloLogin(ctx, decrypt(target.waPhone)) ? "incolo_admin" : await staffChangeRefused(ctx, s, target, { active: false });
-    if (refused) return sendErr(reply, 409, refused);
-    await ctx.db.staffSession.deleteMany({ where: { staffId: target.id } });
-    await ctx.db.otpChallenge.deleteMany({ where: { phoneHash: target.phoneHash } });
-    await ctx.db.staffUser.deleteMany({ where: { id: target.id, clinicId: info.clinic.id } });
-    await audit(ctx, "DOCTOR", s.id, "staff.remove", "StaffUser", target.id);
-    return { ok: true };
+    const s = await requireStaff(ctx, req, reply, "MANAGE"); if (!s) return;
+    return staffOp(reply, async () => removeLogin(ctx, (await clinicInfo(ctx)).clinic.id, { staff: s, incolo: false }, (req.params as { id: string }).id));
   });
   app.get("/api/settings/qr", async (req, reply) => {
     if (!(await requireStaff(ctx, req, reply))) return;
     const link = await walkinLink(ctx, await clinicWaNumber(ctx));
     return { ...link, png: await QRCode.toDataURL(link.url, { margin: 1, width: 512 }) };
   });
-  app.get("/api/settings/display-key", async (req, reply) => { if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return; return { key: (await clinicInfo(ctx)).clinic.displayKey }; });
+  app.get("/api/settings/display-key", async (req, reply) => { if (!(await requireStaff(ctx, req, reply, "MANAGE"))) return; return { key: (await clinicInfo(ctx)).clinic.displayKey }; });
 
   // ── The clinic's own WhatsApp number (customer clinics; doctor only) ──
   // Until the first status check with Meta, a connection only knows its set-up problems: the page shows "checking".
@@ -409,28 +365,91 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
     if (e instanceof ES.SignupError) { ctx.log.warn({ code: e.code, detail: e.detail }, "whatsapp_signup_failed"); return sendErr(reply, 400, e.code); }
     throw e;
   };
-  app.get("/api/whatsapp", async (req, reply) => { if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return; return waView(); });
+  app.get("/api/whatsapp", async (req, reply) => { if (!(await requireStaff(ctx, req, reply, "MANAGE"))) return; return waView(); });
   app.post("/api/whatsapp/connect", async (req, reply) => {
-    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
+    const s = await requireStaff(ctx, req, reply, "MANAGE"); if (!s) return;
     const b = z.object({ code: z.string().min(10).max(2000), wabaId: z.string().regex(/^\d{5,30}$/), phoneNumberId: z.string().regex(/^\d{5,30}$/), connectedBy: z.string().max(80).optional(), coexistence: z.boolean().optional() }).safeParse(req.body);
     if (!b.success) return sendErr(reply, 400, "bad_request");
     try { const r = await ES.connectWhatsApp(ctx, { ...b.data, connectedBy: b.data.connectedBy ?? s.name }, s.id); return { ...(await waView()), problems: r.problems }; } catch (e) { return signupErr(reply, e); }
   });
   app.post("/api/whatsapp/check", async (req, reply) => {
-    if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return;
+    if (!(await requireStaff(ctx, req, reply, "MANAGE"))) return;
     try { await ES.checkConnection(ctx); return waView(); } catch (e) { return signupErr(reply, e); }
   });
   app.post("/api/whatsapp/templates", async (req, reply) => {
-    if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return;
+    if (!(await requireStaff(ctx, req, reply, "MANAGE"))) return;
     try { return await ES.submitTemplates(ctx); } catch (e) { return signupErr(reply, e); }
   });
   app.post("/api/whatsapp/disconnect", async (req, reply) => {
-    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
+    const s = await requireStaff(ctx, req, reply, "MANAGE"); if (!s) return;
     await ES.disconnectWhatsApp(ctx, s.id); return waView();
   });
 
   // ── Customer clinics on their own WhatsApp numbers (Incolo admins) ──
   app.get("/api/admin/clinics", async (req, reply) => { if (!(await requireIncoloAdmin(ctx, req, reply))) return; return listCustomerClinics(ctx); });
+  const customerOp = async (reply: FastifyReply, fn: () => Promise<unknown>) => {
+    try { return (await fn()) ?? { ok: true }; } catch (e) {
+      if (e instanceof CustomerError) return sendErr(reply, e.code === "not_found" ? 404 : 400, e.code);
+      if (e instanceof StaffError) return sendErr(reply, e.code === "not_found" ? 404 : e.code === "bad_request" ? 400 : 409, e.code);
+      throw e;
+    }
+  };
+  // One customer clinic: its details and logins (never its patients).
+  const ownClinic = async (id: string) => { const c = await ctx.db.clinic.findFirst({ where: { id, ownNumber: true }, select: { id: true } }); if (!c) throw new CustomerError("not_found"); return c.id; };
+  app.get("/api/admin/clinics/:id", async (req, reply) => {
+    const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
+    const id = (req.params as { id: string }).id;
+    return customerOp(reply, async () => ({ ...(await customerClinic(ctx, id)), staff: await listLogins(ctx, await ownClinic(id), s) }));
+  });
+  app.post("/api/admin/clinics/:id/status", async (req, reply) => {
+    const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
+    const b = z.object({ status: z.enum(["ACTIVE", "SUSPENDED", "ARCHIVED"]) }).safeParse(req.body); if (!b.success) return sendErr(reply, 400, "bad_request");
+    return customerOp(reply, () => setClinicStatus(ctx, (req.params as { id: string }).id, b.data.status, s.id));
+  });
+  app.delete("/api/admin/clinics/:id", async (req, reply) => {
+    const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
+    const b = z.object({ confirmName: z.string().max(120) }).safeParse(req.body); if (!b.success) return sendErr(reply, 400, "bad_request");
+    return customerOp(reply, () => deleteCustomerClinic(ctx, (req.params as { id: string }).id, b.data.confirmName, s.id));
+  });
+  app.post("/api/admin/clinics/:id/staff", async (req, reply) => {
+    const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
+    const b = StaffIn.safeParse(req.body); if (!b.success) return sendErr(reply, 400, "bad_request");
+    return customerOp(reply, async () => addLogin(ctx, await ownClinic((req.params as { id: string }).id), { staff: s, incolo: true }, b.data));
+  });
+  app.patch("/api/admin/clinics/:id/staff/:staffId", async (req, reply) => {
+    const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
+    const b = StaffPatch.safeParse(req.body); if (!b.success) return sendErr(reply, 400, "bad_request");
+    const p = req.params as { id: string; staffId: string };
+    return customerOp(reply, async () => updateLogin(ctx, await ownClinic(p.id), { staff: s, incolo: true }, p.staffId, b.data));
+  });
+  app.delete("/api/admin/clinics/:id/staff/:staffId", async (req, reply) => {
+    const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
+    const p = req.params as { id: string; staffId: string };
+    return customerOp(reply, async () => removeLogin(ctx, await ownClinic(p.id), { staff: s, incolo: true }, p.staffId));
+  });
+
+  // ── Incolo admins ──
+  const adminOp = async (reply: FastifyReply, fn: () => Promise<unknown>) => {
+    try { return (await fn()) ?? { ok: true }; } catch (e) {
+      if (e instanceof AdminError) return sendErr(reply, e.code === "not_found" ? 404 : e.code === "bad_phone" ? 400 : 409, e.code);
+      throw e;
+    }
+  };
+  app.get("/api/admin/admins", async (req, reply) => { const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return; return listAdmins(ctx, s); });
+  app.post("/api/admin/admins", async (req, reply) => {
+    const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
+    const b = z.object({ name: z.string().trim().min(1).max(60), phone: z.string().max(20) }).safeParse(req.body); if (!b.success) return sendErr(reply, 400, "bad_request");
+    return adminOp(reply, () => addAdmin(ctx, s, b.data));
+  });
+  app.patch("/api/admin/admins/:id", async (req, reply) => {
+    const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
+    const b = z.object({ active: z.boolean() }).safeParse(req.body); if (!b.success) return sendErr(reply, 400, "bad_request");
+    return adminOp(reply, () => setAdminActive(ctx, s, (req.params as { id: string }).id, b.data.active));
+  });
+  app.delete("/api/admin/admins/:id", async (req, reply) => {
+    const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
+    return adminOp(reply, () => removeAdmin(ctx, s, (req.params as { id: string }).id));
+  });
   app.post("/api/admin/clinics", async (req, reply) => {
     const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
     const b = z.object({ clinicName: z.string().trim().min(2).max(80), doctorName: z.string().trim().min(2).max(60), doctorPhone: z.string().max(20), addressShort: z.string().trim().min(2).max(80), clinicPhone: z.string().trim().min(6).max(20) }).safeParse(req.body);
@@ -485,11 +504,11 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
   });
 
   // ── language model (Incolo internal admins only) ──
-  app.get("/api/settings/ai", async (req, reply) => {
+  app.get("/api/admin/ai", async (req, reply) => {
     if (!(await requireIncoloAdmin(ctx, req, reply))) return;
     return { config: await ai.config(), catalog: ai.catalog() };
   });
-  app.put("/api/settings/ai", async (req, reply) => {
+  app.put("/api/admin/ai", async (req, reply) => {
     const s = await requireIncoloAdmin(ctx, req, reply); if (!s) return;
     const r = await ai.update(req.body, s.id);
     return r.saved ? r : reply.code(422).send(r);
@@ -497,7 +516,7 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
 
   // ── reports (aggregates only) ──
   app.get("/api/reports/summary", async (req, reply) => {
-    if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return;
+    if (!(await requireStaff(ctx, req, reply, "MANAGE"))) return;
     const q = req.query as { from?: string; to?: string };
     const n = nowLocal(ctx);
     const from = q.from ?? T.addDays(n.date, -29); const to = q.to ?? n.date;

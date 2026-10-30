@@ -19,7 +19,9 @@ Base: `PUBLIC_BASE_URL`. JSON everywhere. Auth means an httpOnly `sid` cookie (S
 | POST | `/api/auth/otp` | `{phone}` → sends `staff_login_otp` if the phone belongs to active staff (always returns 200, to avoid enumeration) |
 | POST | `/api/auth/verify` | `{phone, code}` → sets the `sid` cookie |
 | POST | `/api/auth/logout` | |
-| GET | `/api/me` | `{name, role}` |
+| GET | `/api/me` | `{name, role, incoloAdmin}` (role: DOCTOR, CLINIC_ADMIN or STAFF). `verify` returns the same; Incolo admins land in the admin portal (`/admin`) |
+
+Two portals. **A clinic's portal** (`/`): its DOCTOR and CLINIC_ADMIN logins manage the clinic ("role: MANAGE" below; a clinic admin never adds, changes or removes a doctor's login, `doctor_only`); STAFF run the desk. **Incolo's admin portal** (`/admin`, `/api/admin/*`, Demo Studio): Incolo admins only, never a customer clinic's patients. A suspended or archived customer clinic answers every `/api/*` call (except `/api/auth/*`) with 403 `clinic_paused`, and its logins get no code.
 
 ## Queue (role: STAFF+)
 | Method | Path | Purpose |
@@ -58,26 +60,33 @@ Base: `PUBLIC_BASE_URL`. JSON everywhere. Auth means an httpOnly `sid` cookie (S
 - `POST /api/payments {appointmentId | queueEntryId, amount (₹)}` → sends the first message now → `{id, whatsappSent}`. Errors: `no_upi` (set the UPI ID first), `no_whatsapp`.
 - `POST /api/payments/:id/paid` (sends the receipt) · `/remind` (once per 12 h, else `too_soon`) · `/cancel`.
 
-## The clinic's own WhatsApp number (role: DOCTOR, customer clinics)
+## The clinic's own WhatsApp number (role: MANAGE, customer clinics)
 - `GET /api/whatsapp` → `{ownNumber, signup: {appId, configId, graphVersion} | null, connection: {displayPhone, verifiedName, connectedBy, connectedAt, checkedAt, health} | null}`.
 - `POST /api/whatsapp/connect {code, wabaId, phoneNumberId, coexistence?}` (from Meta's Embedded Signup pop-up) → the same view + `problems`. Errors: `code_exchange_failed`, `number_not_found`, `number_in_use`, `not_configured`, `not_customer_clinic`.
 - `POST /api/whatsapp/check` · `/templates` (submit missing ones) · `/disconnect`.
 
-## Customer clinics (Incolo admins)
-- `GET /api/admin/clinics` → `[{id, name, doctor, doctorPhone (masked), createdAt, whatsapp: {status, displayPhone, verifiedName} | null}]`.
-- `POST /api/admin/clinics {clinicName, doctorName, doctorPhone, addressShort, clinicPhone}` → `{id, code}`. Errors: `bad_phone`, `phone_in_use` (the doctor's number is still active at another clinic; one that clinic deactivated moves to the new clinic).
+## Incolo admin portal (Incolo admins)
+- `GET /api/admin/clinics` → `[{id, name, code, doctor, doctorPhone (masked), createdAt, status: ACTIVE|SUSPENDED|ARCHIVED, statusChangedAt, logins, whatsapp: {status, displayPhone, verifiedName} | null}]`.
+- `POST /api/admin/clinics {clinicName, doctorName, doctorPhone, addressShort, clinicPhone}` → `{id, code}`. Errors: `bad_phone`, `phone_in_use` (the doctor's number is still active at another clinic, or is an Incolo login; one another clinic released moves to the new clinic).
+- `GET /api/admin/clinics/:id` → the row above + `{addressShort, phone, whatsappDetail, staff: [logins]}`. Never patients.
+- `POST /api/admin/clinics/:id/status {status}`: SUSPENDED (logins signed out and refused, no bot replies, nothing sent, due jobs dropped), ARCHIVED (the same, and its WhatsApp number is disconnected; data kept), ACTIVE (reactivate).
+- `DELETE /api/admin/clinics/:id {confirmName}` → erases the clinic and all its data. Error: `confirm_name` (must equal the clinic's name).
+- `POST /api/admin/clinics/:id/staff`, `PATCH|DELETE /api/admin/clinics/:id/staff/:staffId`: the clinic's logins on its behalf, same body and rules as Settings → Staff (recorded with actor type INCOLO).
+- `GET|POST /api/admin/admins {name, phone}`, `PATCH /api/admin/admins/:id {active}`, `DELETE /api/admin/admins/:id`. Owners (INCOLO_ADMIN_PHONES) and your own admin login can't be changed (`owner`, `own_login`); a customer clinic's login can't be made an admin (`phone_in_use`).
+- `GET|PUT /api/admin/ai`: language model selection (formerly `/api/settings/ai`).
+- Demo Studio: `/api/demo/*` (with `DEMO_STUDIO=true`).
 
-## Settings (role: DOCTOR)
+## Settings (role: MANAGE)
 | Method | Path | Purpose |
 |---|---|---|
 | GET/PUT | `/api/settings/clinic` | Clinic profile + ClinicSettings (zod-validated) |
 | GET/PUT | `/api/settings/sessions` | weekly sessions |
 | GET/POST/DELETE | `/api/settings/closures` | POST returns `{affectedAppointments}`, then `?confirm=1` applies + notifies |
-| GET/POST/PATCH/DELETE | `/api/settings/staff` | add, deactivate, toggle on duty; `DELETE /:id` removes a login permanently (its sign-ins and pending code too, and frees the number). Deactivate and remove are refused with 409: your own login (`own_login`), an Incolo admin's (`incolo_admin`), the clinic's last active doctor (`last_doctor`) can't be deactivated, removed or demoted; a number still active at another clinic (`phone_in_use`) is never changed. Someone changing clinics: once the old clinic deactivates them, adding their number here moves that login over (`{id, moved: true}`), signed out everywhere; Incolo's own logins (admins, presenters, App Review) never move |
+| GET/POST/PATCH/DELETE | `/api/settings/staff` | `POST {name, phone, role}` adds (or updates a login here); `PATCH /:id {onDuty?, active?, role?}`; `DELETE /:id` removes a login permanently (its sign-ins and pending code too, and frees the number). Refused with 409: your own login (`own_login`), an Incolo login (`incolo_admin`), the clinic's last active doctor (`last_doctor`) can't be deactivated, removed or have its role changed; a clinic admin can't touch doctor logins (`doctor_only`); a number still active at another clinic (`phone_in_use`) is never changed. Someone changing clinics: once the old clinic deactivates or removes them, adding their number here moves that login over (`{id, moved: true}`), signed out everywhere |
 | GET | `/api/settings/qr` | today's walk-in QR (PNG) |
 | GET | `/api/settings/display-key` / POST rotate | |
 
-## Reports (Phase 2, role: DOCTOR)
+## Reports (Phase 2, role: MANAGE)
 `GET /api/reports/summary?from=&to=` → aggregates only (counts, averages, peak hours).
 
 ## Display (no session; `key` required)

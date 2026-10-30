@@ -11,6 +11,18 @@ const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 const byNumber = new Map<string, { at: number; scope: Scope | "ignore" }>();
 export function invalidateNumberCache(): void { byNumber.clear(); }
 
+// A customer clinic Incolo suspended or archived: nothing of it runs (logins, bot, sends, jobs, public pages).
+const statusCache = new Map<string, { at: number; active: boolean }>();
+export function invalidateClinicStatus(): void { statusCache.clear(); }
+export async function clinicActive(ctx: Ctx, clinicId: string): Promise<boolean> {
+  const hit = statusCache.get(clinicId);
+  if (hit && Date.now() - hit.at < 5_000) return hit.active;
+  const c = await ctx.db.clinic.findUnique({ where: { id: clinicId }, select: { status: true } });
+  const active = c?.status === "ACTIVE";
+  statusCache.set(clinicId, { at: Date.now(), active });
+  return active;
+}
+
 /**
  * A webhook message's business number: a connected customer clinic's own number → that clinic; a number that was
  * disconnected → ignored (it's no longer ours to answer); anything else (the shared demo number, tests) → demo scope.
@@ -20,7 +32,7 @@ export async function scopeForNumber(ctx: Ctx, phoneNumberId: string | undefined
   const hit = byNumber.get(phoneNumberId);
   if (hit && Date.now() - hit.at < 60_000) return hit.scope;
   const conn = await ctx.db.waConnection.findUnique({ where: { phoneNumberId } });
-  const scope: Scope | "ignore" = !conn ? DEMO : conn.status === "CONNECTED" ? { clinicId: conn.clinicId } : "ignore";
+  const scope: Scope | "ignore" = !conn ? DEMO : conn.status === "CONNECTED" && (await clinicActive(ctx, conn.clinicId)) ? { clinicId: conn.clinicId } : "ignore";
   byNumber.set(phoneNumberId, { at: Date.now(), scope });
   return scope;
 }

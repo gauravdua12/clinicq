@@ -33,7 +33,7 @@ describe("App Review login", () => {
     const me = (await h.app.inject({ url: "/api/me", headers: { cookie } })).json();
     expect(me).toMatchObject({ name: "App Reviewer", role: "STAFF", incoloAdmin: false });
     expect((await h.app.inject({ url: "/api/queue/today", headers: { cookie } })).statusCode).toBe(200);
-    expect((await h.app.inject({ url: "/api/settings/ai", headers: { cookie } })).statusCode).toBe(403); // no Incolo admin pages
+    expect((await h.app.inject({ url: "/api/admin/ai", headers: { cookie } })).statusCode).toBe(403); // no Incolo admin pages
     const staff = await h.db.staffUser.findUniqueOrThrow({ where: { phoneHash: phoneHash(`91${PHONE}`) } });
     expect(staff.onDuty).toBe(false); // never gets staff alerts
   });

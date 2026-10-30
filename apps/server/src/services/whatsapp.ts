@@ -24,9 +24,9 @@ export class RoutedWhatsApp implements WhatsAppClient {
     if (!scope.clinicId) return this.shared;
     const hit = this.clients.get(scope.clinicId);
     if (hit && Date.now() - hit.at < 60_000) { if (hit.client) return hit.client; throw new NotConnectedError(); }
-    const conn = await this.db.waConnection.findUnique({ where: { clinicId: scope.clinicId } });
+    const conn = await this.db.waConnection.findUnique({ where: { clinicId: scope.clinicId }, include: { clinic: { select: { status: true } } } });
     let client: WhatsAppClient | null = null;
-    if (conn?.status === "CONNECTED") {
+    if (conn?.status === "CONNECTED" && conn.clinic.status === "ACTIVE") { // a suspended or archived clinic sends nothing
       client = this.shared instanceof MockWhatsApp
         ? this.shared.as(conn.phoneNumberId)
         : new CloudApiClient({ token: decrypt(conn.token), phoneNumberId: conn.phoneNumberId, graphVersion: this.graphVersion });

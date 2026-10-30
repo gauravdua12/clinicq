@@ -200,7 +200,7 @@ describe("staff login and admin model switch", () => {
     expect(ok.statusCode).toBe(200);
     const cookie = ok.cookies.find((c) => c.name === "sid")!;
     expect((await h.app.inject({ url: "/api/queue/today", cookies: { sid: cookie.value } })).statusCode).toBe(200);
-    expect((await h.app.inject({ url: "/api/settings/ai", cookies: { sid: cookie.value } })).statusCode).toBe(403); // staff isn't admin
+    expect((await h.app.inject({ url: "/api/admin/ai", cookies: { sid: cookie.value } })).statusCode).toBe(403); // staff isn't admin
     expect((await h.app.inject({ url: "/api/queue/today" })).statusCode).toBe(401);
   });
 
@@ -218,15 +218,15 @@ describe("staff login and admin model switch", () => {
     expect((await h.app.inject({ method: "POST", url: "/api/auth/verify", payload: { phone: "9999900002", code } })).statusCode).toBe(200);
   });
 
-  it("doctor can switch the model; bad specs are rejected", async () => {
+  it("an Incolo admin can switch the model; bad specs are rejected", async () => {
     h = await harness({ start: "2026-10-09T12:00:00+05:30" });
-    const login = await h.app.inject({ method: "POST", url: "/api/auth/dev-login", payload: { role: "DOCTOR" } });
+    const login = await h.app.inject({ method: "POST", url: "/api/auth/dev-login", payload: { role: "INCOLO" } });
     const sid = login.cookies.find((c) => c.name === "sid")!.value;
-    const bad = await h.app.inject({ method: "PUT", url: "/api/settings/ai", cookies: { sid }, payload: { primary: "rm -rf" } });
+    const bad = await h.app.inject({ method: "PUT", url: "/api/admin/ai", cookies: { sid }, payload: { primary: "rm -rf" } });
     expect(bad.statusCode).toBe(422);
-    const ok = await h.app.inject({ method: "PUT", url: "/api/settings/ai", cookies: { sid }, payload: { primary: "rules", escalation: "", minConfidence: 0.75 } });
+    const ok = await h.app.inject({ method: "PUT", url: "/api/admin/ai", cookies: { sid }, payload: { primary: "rules", escalation: "", minConfidence: 0.75 } });
     expect(ok.statusCode).toBe(200);
-    const cfg = await h.app.inject({ url: "/api/settings/ai", cookies: { sid } });
+    const cfg = await h.app.inject({ url: "/api/admin/ai", cookies: { sid } });
     expect(cfg.json().config.minConfidence).toBe(0.75);
     expect(await h.db.auditLog.count({ where: { action: "settings.ai" } })).toBe(1);
   });
@@ -449,13 +449,13 @@ describe("internal (Incolo) admin only", () => {
     Object.assign(h.ctx.env, { DEV_TOOLS: false, INCOLO_ADMIN_PHONES: "", DEMO_STUDIO: true }); // production rules
     try {
       expect((await h.app.inject({ url: "/api/me", cookies: { sid } })).json()).toMatchObject({ role: "DOCTOR", incoloAdmin: false });
-      expect((await h.app.inject({ url: "/api/settings/ai", cookies: { sid } })).statusCode).toBe(403);
-      expect((await h.app.inject({ method: "PUT", url: "/api/settings/ai", cookies: { sid }, payload: { primary: "rules" } })).statusCode).toBe(403);
+      expect((await h.app.inject({ url: "/api/admin/ai", cookies: { sid } })).statusCode).toBe(403);
+      expect((await h.app.inject({ method: "PUT", url: "/api/admin/ai", cookies: { sid }, payload: { primary: "rules" } })).statusCode).toBe(403);
       expect((await h.app.inject({ url: "/api/demo", cookies: { sid } })).statusCode).toBe(403);
       expect((await h.app.inject({ url: "/api/settings/sessions", cookies: { sid } })).statusCode).toBe(200); // clinic settings stay theirs
       h.ctx.env.INCOLO_ADMIN_PHONES = "9999900001"; // this person is Incolo's internal admin
       expect((await h.app.inject({ url: "/api/me", cookies: { sid } })).json()).toMatchObject({ incoloAdmin: true });
-      expect((await h.app.inject({ url: "/api/settings/ai", cookies: { sid } })).statusCode).toBe(200);
+      expect((await h.app.inject({ url: "/api/admin/ai", cookies: { sid } })).statusCode).toBe(200);
     } finally {
       Object.assign(h.ctx.env, prev);
     }
