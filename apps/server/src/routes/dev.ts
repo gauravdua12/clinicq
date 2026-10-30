@@ -11,7 +11,7 @@ export async function devRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> {
 
   /** Build a Meta-format webhook, sign it, and post it through the real /webhook route. */
   app.post("/dev/simulate", async (req, reply) => {
-    const b = req.body as { from: string; name?: string; type: "text" | "button" | "voice" | "image" | "flow"; text?: string; buttonId?: string; buttonTitle?: string; voiceText?: string; audioBase64?: string; audioMime?: string; flow?: Record<string, unknown> };
+    const b = req.body as { from: string; name?: string; phoneNumberId?: string; type: "text" | "button" | "voice" | "image" | "flow"; text?: string; buttonId?: string; buttonTitle?: string; voiceText?: string; audioBase64?: string; audioMime?: string; flow?: Record<string, unknown> };
     const wamid = `wamid.sim.${randomUUID()}`;
     let message: Record<string, unknown>;
     if (b.type === "button") message = { type: "interactive", interactive: { type: "button_reply", button_reply: { id: b.buttonId, title: b.buttonTitle ?? b.buttonId } } };
@@ -22,7 +22,7 @@ export async function devRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> {
     } else if (b.type === "image") message = { type: "image", image: { id: `media.${randomUUID()}`, mime_type: "image/jpeg" } };
     else if (b.type === "flow") message = { type: "interactive", interactive: { type: "nfm_reply", nfm_reply: { response_json: JSON.stringify(b.flow ?? {}), name: "flow" } } };
     else message = { type: "text", text: { body: b.text ?? "" } };
-    const payload = JSON.stringify(buildWebhook({ from: b.from.replace(/\D/g, ""), name: b.name, wamid, message }));
+    const payload = JSON.stringify(buildWebhook({ from: b.from.replace(/\D/g, ""), name: b.name, wamid, message, phoneNumberId: b.phoneNumberId }));
     const res = await app.inject({ method: "POST", url: `${ctx.env.BASE_PATH}/webhook`, headers: { "content-type": "application/json", "x-hub-signature-256": signBody(payload, ctx.env.META_APP_SECRET) }, payload });
     return reply.code(res.statusCode).send({ wamid });
   });

@@ -554,9 +554,9 @@ export const COPY = {
     hinglish: "Yeh lamba voice note hai 😊 Chhota voice note (ek minute se kam) bhej denge, ya likh kar bata denge?",
   },
   MAIN_MENU: {
-    en: ["Hello{{nameJi}} 😊 How can I help today?", "Hi again{{nameJi}} 👋 What would you like to do?"],
-    hi: ["नमस्ते{{nameJi}} 😊 आज मैं कैसे मदद करूँ?", "फिर से नमस्ते{{nameJi}} 👋 आप क्या करना चाहेंगे?"],
-    hinglish: ["Namaste{{nameJi}} 😊 Aaj kaise madad karoon?", "Phir se namaste{{nameJi}} 👋 Kya karna chahenge?"],
+    en: ["Hello{{nameJi}} 😊 How can I help today?", "Hi{{nameJi}} 👋 What would you like to do?"],
+    hi: ["नमस्ते{{nameJi}} 😊 आज मैं कैसे मदद करूँ?", "नमस्ते{{nameJi}} 👋 आप क्या करना चाहेंगे?"],
+    hinglish: ["Namaste{{nameJi}} 😊 Aaj kaise madad karoon?", "Hello{{nameJi}} 👋 Kya karna chahenge?"],
   },
   OTHER_HELP: {
     en: ["I can help you book, reschedule, cancel or check your turn in the queue. What would you like to do?", "Here's what I can do: book, reschedule or cancel a visit, or check your turn in the queue. Please pick one."],
