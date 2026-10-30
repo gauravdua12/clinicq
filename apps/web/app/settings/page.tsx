@@ -188,8 +188,15 @@ function ClosuresTab() {
   );
 }
 
+const STAFF_ERR: Record<string, string> = {
+  own_login: "You can't deactivate or demote your own login.",
+  incolo_admin: "This is an Incolo admin login. It can't be deactivated or demoted here.",
+  last_doctor: "This is the clinic's only active doctor login. Add or activate another doctor first.",
+  phone_in_use: "This WhatsApp number already signs in to another clinic.",
+};
+
 function StaffTab() {
-  const [rows, setRows] = useState<{ id: string; name: string; role: string; onDuty: boolean; active: boolean; phone: string }[]>([]);
+  const [rows, setRows] = useState<{ id: string; name: string; role: string; onDuty: boolean; active: boolean; phone: string; you: boolean; incoloAdmin: boolean }[]>([]);
   const [name, setName] = useState(""); const [phone, setPhone] = useState(""); const [role, setRole] = useState("STAFF");
   const s = useSaved();
   const load = useCallback(() => api<typeof rows>("/api/settings/staff").then(setRows), []);
@@ -199,9 +206,14 @@ function StaffTab() {
       <table><thead><tr><th>Name</th><th>WhatsApp</th><th>Role</th><th>On duty</th><th /></tr></thead>
         <tbody>{rows.map((r) => (
           <tr key={r.id} style={{ opacity: r.active ? 1 : 0.5 }}>
-            <td>{r.name}</td><td>{r.phone}</td><td>{r.role === "DOCTOR" ? "Doctor (admin)" : "Staff"}</td>
+            <td>{r.name} {r.you && <span className="pill">You</span>} {r.incoloAdmin && <span className="pill blue">Incolo admin</span>}</td><td>{r.phone}</td><td>{r.role === "DOCTOR" ? "Doctor (admin)" : "Staff"}</td>
             <td><input type="checkbox" style={{ width: "auto", minHeight: 0 }} checked={r.onDuty} onChange={async (e) => { await api(`/api/settings/staff/${r.id}`, { method: "PATCH", body: { onDuty: e.target.checked } }); void load(); }} /></td>
-            <td><button className="ghost small" onClick={async () => { await api(`/api/settings/staff/${r.id}`, { method: "PATCH", body: { active: !r.active } }); void load(); }}>{r.active ? "Deactivate" : "Activate"}</button></td>
+            <td>{r.active && (r.you || r.incoloAdmin) ? null : <button className="ghost small" onClick={async () => {
+              if (r.active && !confirm(`Deactivate ${r.name}? They won't be able to sign in until you activate them again.`)) return;
+              try { await api(`/api/settings/staff/${r.id}`, { method: "PATCH", body: { active: !r.active } }); s.ok(r.active ? `${r.name} deactivated` : `${r.name} activated`); }
+              catch (e) { s.err((e instanceof ApiError && STAFF_ERR[e.code]) || "Couldn't change this login. Try again."); }
+              void load();
+            }}>{r.active ? "Deactivate" : "Activate"}</button>}</td>
           </tr>
         ))}</tbody></table>
       <h2 style={{ marginTop: 16 }}>Add staff</h2>
@@ -209,7 +221,7 @@ function StaffTab() {
         <input style={{ flex: 2 }} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
         <input style={{ flex: 2 }} placeholder="WhatsApp number" value={phone} onChange={(e) => setPhone(e.target.value)} />
         <select style={{ flex: 1 }} value={role} onChange={(e) => setRole(e.target.value)}><option value="STAFF">Staff</option><option value="DOCTOR">Doctor (admin)</option></select>
-        <button className="primary" onClick={async () => { try { await api("/api/settings/staff", { body: { name, phone, role } }); setName(""); setPhone(""); s.ok("Added"); void load(); } catch { s.err("Check the name and 10-digit number."); } }}>Add</button>
+        <button className="primary" onClick={async () => { try { await api("/api/settings/staff", { body: { name, phone, role } }); setName(""); setPhone(""); s.ok("Added"); void load(); } catch (e) { s.err((e instanceof ApiError && STAFF_ERR[e.code]) || "Check the name and 10-digit number."); } }}>Add</button>
       </div>
       {s.state.ok && <div className="ok">{s.state.ok}</div>}{s.state.err && <div className="err">{s.state.err}</div>}
     </div>

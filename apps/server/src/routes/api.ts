@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import QRCode from "qrcode";
 import { z } from "zod";
-import { decrypt, displayPhone, encrypt, maskPhone, normalizeIndianPhone, phoneHash } from "@clinicq/db";
+import { decrypt, displayPhone, encrypt, maskPhone, normalizeIndianPhone, phoneHash, type StaffUser } from "@clinicq/db";
 import { copy as C, slots as S, time as T } from "@clinicq/core";
 import type { Ctx } from "../context";
 import { cancelAppointment, confirmHold, holdSlot, reschedule, SlotTakenError, FamilySlotError } from "../services/booking";
@@ -18,11 +18,28 @@ import { decideOverflow, walkinLink } from "../services/walkin";
 import { ClinicSettings } from "../settings";
 import { activateDemo, createDemo, deleteDemo, extractProfile, resetDemo, type ClinicProfile } from "../services/demo";
 import type { AiRuntime } from "../services/ai";
-import { requireIncoloAdmin, requireStaff } from "./auth";
+import { isListedIncoloAdmin, requireIncoloAdmin, requireStaff } from "./auth";
 
 // REST API for the dashboard and TV (docs/API.md). Phone numbers never appear in list views.
 
 function sendErr(reply: FastifyReply, code: number, c: string) { return reply.code(code).send({ error: { code: c } }); }
+
+/**
+ * Logins that must never be switched off or demoted from Settings → Staff: your own, an Incolo admin's, and a clinic's
+ * last active doctor (without one, nobody could sign in to manage the clinic). Returns the refusal code, or null.
+ */
+async function staffChangeRefused(ctx: Ctx, actor: StaffUser, target: StaffUser, change: { active?: boolean; role?: "DOCTOR" | "STAFF" }): Promise<string | null> {
+  const removes = change.active === false && target.active;
+  const demotes = change.role === "STAFF" && target.role === "DOCTOR";
+  if (!removes && !demotes) return null;
+  if (target.id === actor.id) return "own_login";
+  if (isListedIncoloAdmin(ctx, target)) return "incolo_admin";
+  if (target.role === "DOCTOR" && target.active) {
+    const others = await ctx.db.staffUser.count({ where: { clinicId: target.clinicId, role: "DOCTOR", active: true, id: { not: target.id } } });
+    if (!others) return "last_doctor";
+  }
+  return null;
+}
 
 async function wrapQueue(reply: FastifyReply, fn: () => Promise<unknown>) {
   try { return await fn(); } catch (e) {
@@ -320,9 +337,9 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
   });
   app.delete("/api/settings/closures/:id", async (req, reply) => { const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return; await ctx.db.closure.delete({ where: { id: (req.params as { id: string }).id } }); await audit(ctx, "DOCTOR", s.id, "closure.remove", "Closure", (req.params as { id: string }).id); return { ok: true }; });
   app.get("/api/settings/staff", async (req, reply) => {
-    if (!(await requireStaff(ctx, req, reply, "DOCTOR"))) return;
+    const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
     const rows = await ctx.db.staffUser.findMany({ where: { clinicId: (await clinicInfo(ctx)).clinic.id }, orderBy: { name: "asc" } });
-    return rows.map((r) => ({ id: r.id, name: r.name, role: r.role, onDuty: r.onDuty, active: r.active, phone: maskPhone(decrypt(r.waPhone)) }));
+    return rows.map((r) => ({ id: r.id, name: r.name, role: r.role, onDuty: r.onDuty, active: r.active, phone: maskPhone(decrypt(r.waPhone)), you: r.id === s.id, incoloAdmin: isListedIncoloAdmin(ctx, r) }));
   });
   app.post("/api/settings/staff", async (req, reply) => {
     const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
@@ -330,6 +347,10 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
     const wa = b.success ? normalizeIndianPhone(b.data.phone) : null;
     if (!b.success || !wa) return sendErr(reply, 400, "bad_request");
     const info = await clinicInfo(ctx);
+    const existing = await ctx.db.staffUser.findUnique({ where: { phoneHash: phoneHash(wa) } });
+    if (existing && existing.clinicId !== info.clinic.id) return sendErr(reply, 409, "phone_in_use"); // another clinic's login: never touched from here
+    const refused = existing && (await staffChangeRefused(ctx, s, existing, { role: b.data.role }));
+    if (refused) return sendErr(reply, 409, refused);
     const u = await ctx.db.staffUser.upsert({ where: { phoneHash: phoneHash(wa) }, create: { clinicId: info.clinic.id, name: b.data.name, waPhone: encrypt(wa), phoneHash: phoneHash(wa), role: b.data.role }, update: { name: b.data.name, role: b.data.role, active: true } });
     await audit(ctx, "DOCTOR", s.id, "staff.upsert", "StaffUser", u.id);
     return { id: u.id };
@@ -338,7 +359,11 @@ export async function apiRoutes(app: FastifyInstance, ctx: Ctx, ai: AiRuntime): 
     const s = await requireStaff(ctx, req, reply, "DOCTOR"); if (!s) return;
     const b = z.object({ onDuty: z.boolean().optional(), active: z.boolean().optional() }).safeParse(req.body);
     if (!b.success) return sendErr(reply, 400, "bad_request");
-    await ctx.db.staffUser.update({ where: { id: (req.params as { id: string }).id }, data: b.data });
+    const target = await ctx.db.staffUser.findUnique({ where: { id: (req.params as { id: string }).id } });
+    if (!target || target.clinicId !== (await clinicInfo(ctx)).clinic.id) return sendErr(reply, 404, "not_found");
+    const refused = await staffChangeRefused(ctx, s, target, b.data);
+    if (refused) return sendErr(reply, 409, refused);
+    await ctx.db.staffUser.update({ where: { id: target.id }, data: b.data });
     await audit(ctx, "DOCTOR", s.id, "staff.update", "StaffUser", (req.params as { id: string }).id, b.data);
     return { ok: true };
   });

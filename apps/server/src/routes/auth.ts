@@ -31,9 +31,14 @@ export async function requireStaff(ctx: Ctx, req: FastifyRequest, reply: Fastify
  * doctors count as internal admins so everything can be tried locally.
  */
 export function isIncoloAdmin(ctx: Ctx, staff: StaffUser): boolean {
-  const list = ctx.env.INCOLO_ADMIN_PHONES.split(",").map((p) => normalizeIndianPhone(p)).filter(Boolean);
-  if (list.includes(decrypt(staff.waPhone))) return true;
+  if (isListedIncoloAdmin(ctx, staff)) return true;
   return ctx.env.DEV_TOOLS && ctx.env.NODE_ENV !== "production" && staff.role === "DOCTOR";
+}
+
+/** A number in INCOLO_ADMIN_PHONES itself (no dev-machine allowance): these logins can't be switched off from a clinic. */
+export function isListedIncoloAdmin(ctx: Ctx, staff: StaffUser): boolean {
+  const list = ctx.env.INCOLO_ADMIN_PHONES.split(",").map((p) => normalizeIndianPhone(p)).filter(Boolean);
+  return list.includes(decrypt(staff.waPhone));
 }
 
 export async function requireIncoloAdmin(ctx: Ctx, req: FastifyRequest, reply: FastifyReply): Promise<StaffUser | null> {

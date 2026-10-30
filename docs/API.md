@@ -73,7 +73,7 @@ Base: `PUBLIC_BASE_URL`. JSON everywhere. Auth means an httpOnly `sid` cookie (S
 | GET/PUT | `/api/settings/clinic` | Clinic profile + ClinicSettings (zod-validated) |
 | GET/PUT | `/api/settings/sessions` | weekly sessions |
 | GET/POST/DELETE | `/api/settings/closures` | POST returns `{affectedAppointments}`, then `?confirm=1` applies + notifies |
-| GET/POST/PATCH | `/api/settings/staff` | add, deactivate, toggle on duty |
+| GET/POST/PATCH | `/api/settings/staff` | add, deactivate, toggle on duty. Refused with 409: your own login (`own_login`), an Incolo admin's (`incolo_admin`), the clinic's last active doctor (`last_doctor`) can't be deactivated or demoted; a number that signs in to another clinic (`phone_in_use`) is never changed |
 | GET | `/api/settings/qr` | today's walk-in QR (PNG) |
 | GET | `/api/settings/display-key` / POST rotate | |
 
